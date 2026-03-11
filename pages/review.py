@@ -334,6 +334,13 @@ def _initialize_session(scored_df: pd.DataFrame, filters: dict):
     system_prompt = build_shared_system_prompt(templates=templates)
     st.session_state["system_prompt"] = system_prompt
 
+    # Two-panel selection state
+    # Note: review_order is already filtered by sidebar (region/AE/tier) at this point.
+    # selected_account_key defaults to the first account in that sidebar-filtered order.
+    st.session_state["selected_account_key"] = review_order[0] if review_order else None
+    st.session_state["list_search"] = ""
+    st.session_state["list_tier_filter"] = "All"
+
     st.rerun()
 
 
@@ -343,6 +350,76 @@ def _find_account_row(scored_df: pd.DataFrame, account_key: str) -> Optional[pd.
         if get_account_key(row) == account_key:
             return scored_df.loc[[_]]
     return None
+
+
+def _get_filtered_account_list(
+    scored_df: pd.DataFrame,
+    session: "SessionState",
+    list_search: str,
+    list_tier_filter: str,
+) -> list[str]:
+    """
+    Return account keys visible in the left panel, in review_order ordering.
+
+    Applies left-panel filters (search + tier) on top of whatever sidebar
+    filters already produced session.review_order.
+    """
+    search = list_search.strip().lower()
+    keys = []
+    for key in session.review_order:
+        row_df = _find_account_row(scored_df, key)
+        if row_df is None:
+            continue
+        row = row_df.iloc[0]
+        account_name = str(row.get("account_name", "")).lower()
+        tier = str(row.get("attention_tier", ""))
+
+        if search and search not in account_name:
+            continue
+        if list_tier_filter != "All" and tier != list_tier_filter:
+            continue
+        keys.append(key)
+    return keys
+
+
+def _next_pending_key(
+    filtered_keys: list[str],
+    current_key: str,
+    decisions: dict,
+) -> str | None:
+    """
+    Return the next key after current_key in filtered_keys that has no decision yet.
+
+    `decisions` is session.decisions — a dict keyed by account_key.
+    Returns None if no pending account exists.
+    """
+    found_current = False
+    for key in filtered_keys:
+        if key == current_key:
+            found_current = True
+            continue
+        if found_current and key not in decisions:
+            return key
+    # Wrap-search from beginning if not found after current
+    for key in filtered_keys:
+        if key == current_key:
+            break
+        if key not in decisions:
+            return key
+    return None
+
+
+def _resolve_selected_key(
+    filtered_keys: list[str],
+    current_selected: str | None,
+) -> str | None:
+    """
+    Return current_selected if it is still in filtered_keys.
+    Otherwise return the first key in filtered_keys, or None if empty.
+    """
+    if current_selected in filtered_keys:
+        return current_selected
+    return filtered_keys[0] if filtered_keys else None
 
 
 def _get_or_generate_comment(row: pd.Series, scoring: dict, account_key: str, model: str) -> str:
