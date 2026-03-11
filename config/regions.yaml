@@ -1,0 +1,55 @@
+
+# Google Drive configuration and regional file discovery.
+# Replace shared_folder_id with the actual Google Drive folder ID
+# (visible in the folder URL: drive.google.com/drive/folders/<FOLDER_ID>)
+
+drive:
+  shared_folder_id: "1v_1o1UFoRCk-MGJcuF9RxkGkMo20kaCg"
+
+  # Filename patterns to match regional files.
+  # Uses fnmatch syntax: * matches any characters.
+  # If a pattern matches multiple files, the first match (alphabetical) is used.
+  file_pattern_map:
+    APAC:  "*APAC*"
+    EMEA:  "*EMEA*"
+    LATAM: "*LATAM*"
+    NA:    "*NA*"
+    # Add more regions as needed, e.g.:
+    # MEA:   "*MEA*"
+    # ANZ:   "*ANZ*"
+
+# Sheet tab name heuristics for auto-detection.
+# The loader checks if a tab name contains any of these keywords (case-insensitive).
+sheet_type_keywords:
+  maps:
+    - "map"
+    - "territory"
+    - "ae "
+    - "account exec"
+    - "contact"
+  tech_stake:
+    - "tech"
+    - "stake"
+    - "stack"
+    - "product"
+    - "usage"
+    - "technology"
+  summary:
+    - "summary"
+    - "overview"
+    - "account plan"
+    - "pipeline"
+    - "planning"
+    - "account planning"
+
+# Fallback: if auto-detection fails, use these explicit sheet names.
+# Set to null to rely purely on auto-detection.
+explicit_sheet_names:
+  maps: "Maps"
+  tech_stake: "Current Tech Stake Information"
+  summary: "Account Summary"
+
+# Tab where CRO-approved comments are written back.
+# Must contain a "Customer Name" column matching account names.
+# Change this to "Maps" or "Current Tech Stake Information" as needed.
+comment_write_tab: "Maps"

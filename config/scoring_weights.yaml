@@ -1,0 +1,46 @@
+
+# Scoring weights and thresholds for the CRO scoring engine.
+# Adjust these without touching any Python code.
+
+weights:
+  nrr: 0.50        # NRR is the #1 metric
+  threading: 0.25  # Multi-threading gap
+  expansion: 0.25  # Expansion opportunity (also signals engagement priority)
+
+nrr_thresholds:
+  critical: 90.0   # Below this = CRITICAL tier, forced P1 override
+  at_risk: 100.0   # Below this = AT_RISK tier
+  healthy: 110.0   # Below this = HEALTHY tier (above = STRONG)
+  missing_score: 60.0  # Score assigned when NRR data is absent
+
+threading_scores:
+  zero_contacts: 100    # No contacts recorded
+  single_contact: 85    # Only one exec contact
+  dual_contacts: 40     # Two exec contacts
+  multi_contacts: 0     # Three or more exec contacts
+  missing_score: 70     # Assume single-threaded when data absent
+
+expansion_scores:
+  whitespace_per_channel: 5     # Each None/blank channel
+  competitor_per_channel: 8     # Each competitor-held channel (higher: displacement opportunity)
+  low_penetration_bonus: 10     # < 3 Insider products AND ARR >= low_penetration_arr_min
+  zero_products_bonus: 15       # Zero Insider One products (stacked with low_penetration_bonus)
+  low_penetration_arr_min: 50000  # Minimum ARR for low penetration bonus (USD)
+  max_score: 100
+
+expansion_tiers:
+  high: 60     # Score >= this = HIGH
+  medium: 30   # Score >= this AND < high = MEDIUM
+  # Below medium = LOW
+
+composite_tiers:
+  p1_threshold: 65        # Composite >= this = P1
+  p2_threshold: 40        # Composite >= this AND < p1 = P2
+  # Below p2 = P3
+  renewal_days_p1: 90     # Renewal within this many days forces P1 regardless of score
+
+hard_overrides:
+  # These conditions force P1 regardless of composite score
+  - condition: nrr_critical        # NRR tier == CRITICAL
+  - condition: renewal_imminent    # Renewal within renewal_days_p1 days
+  - condition: health_score_low    # Health score <= 2 (on 1-10 scale)

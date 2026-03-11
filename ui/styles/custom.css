@@ -1,0 +1,156 @@
+/* Global Account Review Agent — Custom Streamlit Styles */
+
+/* ── Card containers ──────────────────────────────────────────────────────── */
+.review-card {
+    background-color: #1a1a2e;
+    border: 1px solid #2d2d4a;
+    border-radius: 12px;
+    padding: 1.5rem;
+    margin-bottom: 1rem;
+}
+
+.account-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1rem;
+    padding-bottom: 0.75rem;
+    border-bottom: 1px solid #2d2d4a;
+}
+
+/* ── Tier badges ──────────────────────────────────────────────────────────── */
+.badge {
+    display: inline-block;
+    padding: 0.25rem 0.75rem;
+    border-radius: 20px;
+    font-size: 0.75rem;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+}
+
+.badge-p1 { background-color: #dc3545; color: white; }
+.badge-p2 { background-color: #fd7e14; color: white; }
+.badge-p3 { background-color: #198754; color: white; }
+
+.badge-critical { background-color: #dc3545; color: white; }
+.badge-at-risk  { background-color: #ffc107; color: #1a1a1a; }
+.badge-healthy  { background-color: #198754; color: white; }
+.badge-strong   { background-color: #0dcaf0; color: #1a1a1a; }
+.badge-unknown  { background-color: #6c757d; color: white; }
+
+.badge-single { background-color: #dc3545; color: white; }
+.badge-dual   { background-color: #fd7e14; color: white; }
+.badge-multi  { background-color: #198754; color: white; }
+
+/* ── Tech Stake section ───────────────────────────────────────────────────── */
+.tech-stake-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+    margin-bottom: 0.5rem;
+}
+
+.channel-chip {
+    display: inline-block;
+    padding: 0.2rem 0.6rem;
+    border-radius: 12px;
+    font-size: 0.72rem;
+    font-weight: 500;
+}
+
+.chip-insider     { background-color: #0d6efd22; color: #6ea8fe; border: 1px solid #0d6efd44; }
+.chip-competitor  { background-color: #dc354522; color: #ea868f; border: 1px solid #dc354544; }
+.chip-whitespace  { background-color: #19875422; color: #75b798; border: 1px solid #19875444; }
+
+/* ── Comment box ──────────────────────────────────────────────────────────── */
+.comment-box {
+    background-color: #0f0f1e;
+    border-left: 4px solid #6ea8fe;
+    border-radius: 0 8px 8px 0;
+    padding: 1rem 1.25rem;
+    font-style: italic;
+    font-size: 0.95rem;
+    line-height: 1.6;
+    margin: 1rem 0;
+    color: #e2e8f0;
+}
+
+/* ── Metric cards ─────────────────────────────────────────────────────────── */
+.metric-row {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 0.75rem;
+    margin-bottom: 1rem;
+}
+
+.metric-card {
+    background-color: #12122a;
+    border: 1px solid #2d2d4a;
+    border-radius: 8px;
+    padding: 0.75rem 1rem;
+    text-align: center;
+}
+
+.metric-label {
+    font-size: 0.7rem;
+    color: #9ca3af;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-bottom: 0.25rem;
+}
+
+.metric-value {
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: #e2e8f0;
+}
+
+/* ── Action buttons ───────────────────────────────────────────────────────── */
+.action-row {
+    display: flex;
+    gap: 0.75rem;
+    margin-top: 1rem;
+    align-items: center;
+}
+
+/* ── Progress sidebar ─────────────────────────────────────────────────────── */
+.progress-section {
+    background-color: #12122a;
+    border-radius: 8px;
+    padding: 1rem;
+    margin-bottom: 1rem;
+}
+
+.progress-label {
+    font-size: 0.75rem;
+    color: #9ca3af;
+    margin-bottom: 0.25rem;
+}
+
+/* ── Section headers ──────────────────────────────────────────────────────── */
+.section-header {
+    font-size: 0.8rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: #6ea8fe;
+    margin: 1rem 0 0.5rem 0;
+    padding-bottom: 0.25rem;
+    border-bottom: 1px solid #2d2d4a;
+}
+
+/* ── Risk signal flags ────────────────────────────────────────────────────── */
+.risk-flag {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.85rem;
+    margin-bottom: 0.3rem;
+    padding: 0.3rem 0.6rem;
+    border-radius: 6px;
+}
+
+.risk-flag-critical { background-color: #dc354515; color: #ea868f; }
+.risk-flag-warning  { background-color: #ffc10715; color: #ffda6a; }
+.risk-flag-positive { background-color: #19875415; color: #75b798; }

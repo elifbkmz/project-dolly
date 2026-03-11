@@ -1,0 +1,36 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python3 -c \":*)",
+      "Bash(python -m py_compile src/google/auth.py src/google/drive_client.py src/google/sheets_client.py)",
+      "Bash(python -m py_compile src/ingestion/loader.py src/ingestion/normalizer.py src/ingestion/joiner.py src/ingestion/tone_scraper.py)",
+      "Bash(python -m py_compile src/scoring/nrr_scorer.py src/scoring/threading_scorer.py src/scoring/expansion_scorer.py src/scoring/composite.py src/scoring/engine.py)",
+      "Bash(python3 -m py_compile src/google/auth.py src/google/drive_client.py src/google/sheets_client.py)",
+      "Bash(python3 -m py_compile src/ingestion/loader.py src/ingestion/normalizer.py src/ingestion/joiner.py src/ingestion/tone_scraper.py)",
+      "Bash(python3 -m py_compile src/scoring/nrr_scorer.py src/scoring/threading_scorer.py src/scoring/expansion_scorer.py src/scoring/composite.py src/scoring/engine.py)",
+      "Bash(python3 -m py_compile src/llm/client.py src/llm/prompt_builder.py src/llm/comment_generator.py)",
+      "Bash(python3 -m py_compile src/session/state.py src/session/persistence.py src/report/sections.py src/report/builder.py src/utils/config_loader.py src/utils/validators.py)",
+      "Bash(python3 -m py_compile ui/components/risk_badges.py ui/components/tech_stake_chart.py ui/components/progress_sidebar.py ui/components/review_card.py)",
+      "Bash(python3 -m py_compile pages/review.py pages/dashboard.py pages/report.py app.py)",
+      "Bash(pip3 install -r requirements.txt)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://localhost:8501)",
+      "Bash(jobs -l)",
+      "Bash(open http://localhost:8501)",
+      "Bash(python3 -m py_compile src/ingestion/tone_scraper.py src/llm/comment_generator.py src/scoring/engine.py src/session/state.py pages/review.py)",
+      "Bash(python3 -m py_compile src/google/drive_client.py src/ingestion/loader.py)",
+      "Bash(python3 -m py_compile src/google/sheets_client.py)",
+      "Bash(echo \"Value starts with: $ANTHROPIC_API_KEY:0:10...\")",
+      "Bash(open \"/Users/elifbikmaz/Desktop/project dolly/.streamlit/secrets.toml\")",
+      "Bash(pkill -f \"streamlit run\")",
+      "Bash(python3 -m streamlit --version)",
+      "Bash(pip3 show streamlit)",
+      "Bash(python3 -:*)",
+      "Bash(pkill -f \"streamlit\")",
+      "Bash(python -c \":*)",
+      "Bash(lsof -i :8501 -t)",
+      "Bash(kill -9 19852 72381)",
+      "Bash(python3 -c \"from src.google.sheets_client import write_comments_to_summary; print\\(''OK''\\)\")",
+      "Bash(pip show streamlit)"
+    ]
+  }
+}

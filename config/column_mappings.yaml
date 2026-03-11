@@ -1,0 +1,384 @@
+
+# Column name normalization map.
+# The normalizer renames any matching alias to the canonical key.
+# Matching is case-insensitive and whitespace-normalized.
+
+summary_tab:
+  account_name:
+    - "Customer Name"
+    - "Account Name"
+    - "Client"
+    - "Client Name"
+    - "Account"
+    - "Company"
+    - "Company Name"
+  arr:
+    - "ARR"
+    - "Annual Recurring Revenue"
+    - "Revenue"
+    - "Contract Value"
+    - "ACV"
+    - "Annual Contract Value"
+    - "Total ARR"
+    - "MRR"
+    - "MRR\n(This is Entity MRR)"
+    - "Monthly Recurring Revenue"
+    - "MRR (This is Entity MRR)"
+  nrr:
+    - "NRR"
+    - "Net Revenue Retention"
+    - "Net Retention Rate"
+    - "NRR %"
+    - "Net Retention"
+    - "Retention %"
+    - "Total Increase of MRR % (in local currency)"
+    - "Last 12 Months Increase of MRR %\n(in local currency)"
+    - "Last 12 Months Increase of MRR % (in local currency)"
+    - "MRR Growth %"
+  renewal_date:
+    - "Renewal Date"
+    - "Contract Renewal"
+    - "Next Renewal"
+    - "Renewal"
+    - "Contract End Date"
+    - "Expiry Date"
+    - "Renewal Date\n(Day/Month/Year)"
+    - "Renewal Date (Day/Month/Year)"
+  health_score:
+    - "Health Score"
+    - "Account Health"
+    - "CS Health Score"
+    - "Health"
+    - "Customer Health"
+    - "Health Rating"
+    - "Focus"
+  deal_stage:
+    - "Deal Stage"
+    - "Stage"
+    - "Renewal Stage"
+    - "Opportunity Stage"
+    - "Account Stage"
+    - "Status"
+    - "Forecast \nCategory"
+    - "Forecast\nCategory"
+    - "Forecast Category"
+  next_steps:
+    - "Next Steps"
+    - "Next Step"
+    - "Action Items"
+    - "Actions"
+    - "CRO Notes"
+    - "Comments"
+    - "Notes"
+    - "Strategic Notes"
+
+maps_tab:
+  account_name:
+    - "Customer Name"
+    - "Account Name"
+    - "Client"
+    - "Client Name"
+    - "Account"
+    - "Company"
+  ae_name:
+    - "AE Name"
+    - "Account Executive"
+    - "AE"
+    - "Sales Rep"
+    - "Owner"
+    - "AM Name"
+    - "Account Manager"
+    - "Rep"
+    - "Account Director"
+    - "Account Director Name"
+    - "Regional Director"
+  arr:
+    - "ARR"
+    - "Annual Recurring Revenue"
+    - "MRR"
+    - "MRR\n(This is Entity MRR)"
+    - "MRR (This is Entity MRR)"
+    - "Monthly Recurring Revenue"
+    - "Contract Value"
+  nrr:
+    - "NRR"
+    - "Net Revenue Retention"
+    - "Total Increase of MRR % (in local currency)"
+    - "MRR Growth %"
+    - "NRR %"
+  renewal_date:
+    - "Renewal Date"
+    - "Contract Renewal"
+    - "Next Renewal"
+    - "Renewal"
+    - "Contract End Date"
+    - "Expiry Date"
+    - "Renewal Date\n(Day/Month/Year)"
+    - "Renewal Date (Day/Month/Year)"
+  health_score:
+    - "Health Score"
+    - "Account Health"
+    - "CS Health Score"
+    - "Health"
+    - "Customer Health"
+    - "Health Rating"
+    - "Focus"
+    - "Customer Focus"
+  deal_stage:
+    - "Deal Stage"
+    - "Stage"
+    - "Renewal Stage"
+    - "Opportunity Stage"
+    - "Account Stage"
+    - "Status"
+    - "Forecast \nCategory"
+    - "Forecast\nCategory"
+    - "Forecast Category"
+  next_steps:
+    - "Next Steps"
+    - "Next Step"
+    - "Action Items"
+    - "Actions"
+    - "CRO Notes"
+    - "Comments"
+    - "Notes"
+    - "Strategic Notes"
+    - "Next Steps & Execution Strategy"
+  competitive_strategy:
+    - "Competitive Replacement Strategy"
+    - "Competitive Strategy"
+    - "Displacement Strategy"
+    - "Competitor Strategy"
+    - "Competitive Replacement Strategy\n(Please address each question below. Add any additional product-specific insights that strengthen the replacement case.)"
+  focus_product:
+    - "Focus Product"
+    - "Target Product"
+    - "Priority Product"
+    - "Product Focus"
+    - "Upsell Product"
+  estimated_amount:
+    - "Estimated Amount (USD)"
+    - "Estimated Amount"
+    - "Deal Value"
+    - "Opportunity Value"
+    - "Estimated Value"
+    - "Deal Size"
+  estimated_closing_date:
+    - "Estimated \nClosing Date\n(Day/Month/Year)"
+    - "Estimated Closing Date"
+    - "Expected Close Date"
+    - "Close Date"
+    - "Closing Date"
+  acquisition_type:
+    - "Acquisition Type"
+    - "Deal Type"
+    - "Opportunity Type"
+    - "Motion Type"
+  auto_renewal:
+    - "Auto Renewal Clause"
+    - "Auto-Renewal"
+    - "Auto Renewal"
+    - "Autorenewal"
+  csm_name:
+    - "Customer Success Manager"
+    - "CSM"
+    - "CSM Name"
+    - "Success Manager"
+  csm_approval:
+    - "CSMs Approval to the strategy"
+    - "CSM Approval"
+    - "CSM Sign-off"
+    - "Strategy Approval"
+  customer_lifetime:
+    - "Customer Lifetime in Months"
+    - "Customer Tenure"
+    - "Months as Customer"
+    - "Tenure (Months)"
+  insider_utilization:
+    - "Insider Utilization by Product"
+    - "Product Utilization"
+    - "Utilization Rate"
+    - "Usage Rate"
+  territory:
+    - "Territory"
+    - "Region Territory"
+    - "Sub-Region"
+    - "Sub Region"
+    - "Market"
+    - "Geo"
+  exec_contacts:
+    - "Exec Contacts"
+    - "Executive Contacts"
+    - "Key Contacts"
+    - "Stakeholders"
+    - "Number of Contacts"
+    - "Contact Count"
+    - "Exec Count"
+    - "# Contacts"
+
+tech_stake_tab:
+  account_name:
+    - "Customer Name"
+    - "Account Name"
+    - "Client"
+    - "Account"
+    - "Company"
+  instance_name:
+    - "Instance Name"
+    - "Instance"
+    - "Subdomain"
+    - "Partner Name"
+    - "Inone Name"
+  insider_product_count:
+    - "Insider One Product Usage"
+    - "Insider Products Used"
+    - "Insider One Count"
+    - "Insider One Product Count"
+    - "# Insider Products"
+  non_insider_product_count:
+    - "Non-Insider One Product Usage"
+    - "Non Insider One Product Usage"
+    - "Non-Insider Count"
+    - "Competitor Products"
+    - "# Non-Insider Products"
+
+  # Tech Stake channel columns — matched via fuzzy matching in normalizer
+  channels:
+    cdp:
+      - "CDP"
+      - "Customer Data Platform"
+      - "Customer Data Platform (CDP)"
+      - "Customer Data Platform \n(CDP)"
+      - "Customer Data Platform\n(CDP)"
+    marketing_automation:
+      - "Marketing Automation (Architect)"
+      - "Marketing Automation"
+      - "Architect"
+      - "MA"
+      - "Marketing Automation\n(Architect)"
+    email_promotional:
+      - "Email (Promotional)"
+      - "Email Promotional"
+      - "Promo Email"
+      - "Email Promo"
+      - "Email"
+    email_transactional:
+      - "Email (Transactional)"
+      - "Email Transactional"
+      - "Transactional Email"
+    sms_mms_rcs:
+      - "SMS/MMS/RCS (Promotional)"
+      - "SMS/MMS/RCS"
+      - "SMS"
+      - "MMS"
+      - "SMS/MMS/RCS\n(Promotional)"
+    sms_transactional:
+      - "SMS (Transactional)"
+      - "SMS Transactional"
+    mobile_app_suite:
+      - "Mobile App Suite"
+      - "Mobile App"
+      - "App"
+      - "Mobile"
+    smart_recommender:
+      - "Recommendation Engine (Smart Recommender)"
+      - "Smart Recommender"
+      - "Recommender"
+      - "Recommendation Engine"
+    eureka_search:
+      - "Search and Merchandising (Eureka)"
+      - "Eureka Search"
+      - "Eureka"
+      - "Search"
+      - "Search & Merchandising"
+    whatsapp_marketing:
+      - "Whatsapp Marketing (Promotional)"
+      - "WhatsApp Marketing (Promotional)"
+      - "WhatsApp Marketing"
+      - "WA Marketing"
+    whatsapp_utility:
+      - "WhatsApp Utility (Transactional)"
+      - "WhatsApp Utility"
+      - "WA Utility"
+    whatsapp_otp:
+      - "WhatsApp OTP"
+      - "WA OTP"
+    conversational_commerce:
+      - "Conversational Commerce (Shopping Agent)"
+      - "Conversational Commerce"
+      - "Conv Commerce"
+      - "Shopping Agent"
+    customer_support_chatbot:
+      - "Customer Support Chatbot (MindBehind/Support Agent)"
+      - "Customer Support Chatbot"
+      - "Support Bot"
+      - "Chatbot"
+      - "MindBehind"
+    web_personalization:
+      - "Web Personalization\nA/B Testing"
+      - "Web Personalization/A/B Testing"
+      - "Web Personalization"
+      - "A/B Testing"
+      - "Web Personalization A/B Testing"
+    analytics_insights:
+      - "Analytics & Insights (Behavior Analytics)"
+      - "Analytics & Insights \n(Behavior Analytics) "
+      - "Analytics & Insights"
+      - "Analytics"
+      - "Insights"
+      - "Behavior Analytics"
+
+# Channel column canonical names (flat list for expansion scorer)
+channel_canonical_names:
+  - cdp
+  - marketing_automation
+  - email_promotional
+  - email_transactional
+  - sms_mms_rcs
+  - sms_transactional
+  - mobile_app_suite
+  - smart_recommender
+  - eureka_search
+  - whatsapp_marketing
+  - whatsapp_utility
+  - whatsapp_otp
+  - conversational_commerce
+  - customer_support_chatbot
+  - web_personalization
+  - analytics_insights
+
+# Values that signal Insider One ownership
+insider_values:
+  - "Insider One"
+  - "insider one"
+  - "Insider"
+
+# Values that signal white space (no vendor, potential expansion)
+whitespace_values:
+  - "None"
+  - "none"
+  - "Not Applicable"
+  - "N/A"
+  - "NA"
+  - ""
+
+# Values that are displaceable competitors
+competitor_values:
+  - "Salesforce"
+  - "Adobe"
+  - "Inhouse"
+  - "In House"
+  - "In-house"
+  - "Inhouse"
+  - "HubSpot"
+  - "Hubspot"
+  - "Klaviyo"
+  - "Netcore"
+  - "Mixpanel"
+  - "Amplitude"
+  - "Braze"
+  - "Iterable"
+  - "MoEngage"
+  - "Algolia"
+  - "Zendesk"
+  - "Genesys"

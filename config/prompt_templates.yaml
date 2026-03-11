@@ -1,0 +1,68 @@
+
+# Claude prompt templates for CRO comment generation.
+# Placeholders in {curly_braces} are filled at runtime by prompt_builder.py
+
+system_prompt_template: |
+  You are acting as {cro_name}, {cro_title} at {company_name}.
+
+  YOUR PHILOSOPHY:
+  {cro_philosophy}
+
+  YOUR VOICE RULES:
+  {voice_rules}
+
+  {tone_calibration_section}
+
+user_prompt_template: |
+  Review this account and write your {sentence_count}-sentence CRO comment.
+
+  ACCOUNT: {account_name}
+  REGION: {region}
+  AE: {ae_name}  |  CSM: {csm_name}  |  Customer for: {customer_lifetime} months
+
+  FINANCIALS:
+  - MRR: {arr_display}
+  - NRR: {nrr_display}  [{nrr_tier}]
+  - Renewal: {renewal_date} ({renewal_days_out} days out)  |  Auto-Renewal: {auto_renewal}
+  - Focus / Health: {health_score}
+  - Forecast Category: {deal_stage}
+
+  ACTIVE OPPORTUNITY (from Maps tab):
+  - Acquisition Type: {acquisition_type}
+  - Focus Product: {focus_product}
+  - Estimated Value: {estimated_amount}
+  - Expected Close: {estimated_closing_date}
+  - CSM Approval of Strategy: {csm_approval}
+
+  AE'S NEXT STEPS & STRATEGY:
+  {next_steps}
+
+  AE'S COMPETITIVE REPLACEMENT STRATEGY:
+  {competitive_strategy}
+
+  TECH STAKE — Insider One coverage:
+  - Insider Products Active: {insider_product_count} of {total_channels} channels
+  - Active Insider Products: {insider_channels_display}
+  - Insider Utilization Rate: {insider_utilization}
+  - Competitor-held channels: {competitor_channels_display}
+  - White-space channels (uncaptured): {whitespace_channels_display}
+  - Co-existing competitors noted: {coexisting_competitors}
+
+  RISK SIGNALS:
+  - Attention Tier: {attention_tier}
+  - Primary driver: {primary_signal}
+  - NRR Score: {nrr_score:.0f}/100  |  Threading Score: {threading_score:.0f}/100  |  Expansion Score: {expansion_score:.0f}/100
+
+  Using the AE's strategy notes and tech stake context above, write your CRO comment now.
+  Be specific — reference the focus product, key risks or whitespace, and what you expect from the AE.
+  Do not use bullet points or headers. Output only the comment text, nothing else.
+
+tone_calibration_header: |
+  VOICE CALIBRATION — examples of how you actually write about accounts:
+
+sentence_count: "2-3"
+
+# Temperature settings (can be overridden at runtime)
+generation_temperature: 0.7
+regeneration_temperature: 0.85
+max_tokens: 512

@@ -1,0 +1,7 @@
+[server]
+# Use poll-based file watcher so Streamlit detects changes in ALL
+# subdirectories (pages/, ui/components/, src/, config/) not just app.py
+fileWatcherType = "poll"
+
+[browser]
+gatherUsageStats = false

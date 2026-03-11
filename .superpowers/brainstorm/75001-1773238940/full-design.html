@@ -1,0 +1,193 @@
+<h2>Proposed Review Page — Full Layout</h2>
+<p class="subtitle">Two-panel design combining your selections. This is what we'll build.</p>
+
+<div class="mockup">
+  <div class="mockup-header">Review Tab — Two-Panel Layout</div>
+  <div class="mockup-body" style="padding:0;overflow:hidden;border-radius:0 0 6px 6px">
+    <div style="display:flex;height:520px;font-family:monospace;font-size:11px;background:#0f172a">
+
+      <!-- LEFT PANEL: Account List -->
+      <div style="width:300px;min-width:300px;background:#1e293b;display:flex;flex-direction:column;border-right:1px solid #334155">
+
+        <!-- List header -->
+        <div style="padding:10px 12px;border-bottom:1px solid #334155;background:#1e293b">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+            <span style="color:#94a3b8;font-size:9px;text-transform:uppercase;letter-spacing:1px">Accounts</span>
+            <span style="background:#334155;color:#94a3b8;font-size:8px;padding:1px 6px;border-radius:10px">47</span>
+            <span style="margin-left:auto;color:#4ade80;font-size:9px">12 done</span>
+          </div>
+          <div style="display:flex;gap:4px">
+            <div style="flex:1;background:#0f172a;border:1px solid #334155;border-radius:3px;padding:4px 7px;color:#64748b;font-size:9px">🔍 filter...</div>
+            <div style="background:#0f172a;border:1px solid #334155;border-radius:3px;padding:4px 7px;color:#64748b;font-size:9px">P1▾</div>
+          </div>
+        </div>
+
+        <!-- Account rows -->
+        <div style="flex:1;overflow-y:auto;padding:6px 8px;display:flex;flex-direction:column;gap:3px">
+
+          <!-- Selected row -->
+          <div style="background:#0f3460;border-radius:4px;padding:7px 9px;border-left:3px solid #3b82f6;cursor:pointer">
+            <div style="display:flex;align-items:center;gap:5px">
+              <span style="background:#ef4444;color:#fff;font-size:8px;padding:1px 5px;border-radius:2px;font-weight:bold">P1</span>
+              <span style="color:#fff;font-size:10px;font-weight:600">Acme Corp</span>
+              <span style="margin-left:auto;color:#f59e0b;font-size:8px">pending</span>
+            </div>
+            <div style="display:flex;gap:10px;margin-top:3px">
+              <span style="color:#f87171;font-size:9px">NRR 82%</span>
+              <span style="color:#94a3b8;font-size:9px">↻ 47d</span>
+              <span style="color:#94a3b8;font-size:9px">APAC</span>
+            </div>
+          </div>
+
+          <!-- Approved row -->
+          <div style="background:#1e293b;border-radius:4px;padding:7px 9px;border-left:3px solid #22c55e;cursor:pointer;opacity:0.8">
+            <div style="display:flex;align-items:center;gap:5px">
+              <span style="background:#ef4444;color:#fff;font-size:8px;padding:1px 5px;border-radius:2px;font-weight:bold">P1</span>
+              <span style="color:#cbd5e1;font-size:10px">Initrode</span>
+              <span style="margin-left:auto;color:#22c55e;font-size:8px">✓ approved</span>
+            </div>
+            <div style="display:flex;gap:10px;margin-top:3px">
+              <span style="color:#f87171;font-size:9px">NRR 88%</span>
+              <span style="color:#94a3b8;font-size:9px">↻ 31d</span>
+              <span style="color:#94a3b8;font-size:9px">NA</span>
+            </div>
+          </div>
+
+          <div style="background:#1e293b;border-radius:4px;padding:7px 9px;border-left:3px solid #334155;cursor:pointer">
+            <div style="display:flex;align-items:center;gap:5px">
+              <span style="background:#f59e0b;color:#fff;font-size:8px;padding:1px 5px;border-radius:2px;font-weight:bold">P2</span>
+              <span style="color:#cbd5e1;font-size:10px">TechFlow Ltd</span>
+              <span style="margin-left:auto;color:#f59e0b;font-size:8px">pending</span>
+            </div>
+            <div style="display:flex;gap:10px;margin-top:3px">
+              <span style="color:#fbbf24;font-size:9px">NRR 97%</span>
+              <span style="color:#94a3b8;font-size:9px">↻ 120d</span>
+              <span style="color:#94a3b8;font-size:9px">EMEA</span>
+            </div>
+          </div>
+
+          <div style="background:#1e293b;border-radius:4px;padding:7px 9px;border-left:3px solid #334155;cursor:pointer">
+            <div style="display:flex;align-items:center;gap:5px">
+              <span style="background:#f59e0b;color:#fff;font-size:8px;padding:1px 5px;border-radius:2px;font-weight:bold">P2</span>
+              <span style="color:#cbd5e1;font-size:10px">Globex Inc</span>
+              <span style="margin-left:auto;color:#64748b;font-size:8px">– skipped</span>
+            </div>
+            <div style="display:flex;gap:10px;margin-top:3px">
+              <span style="color:#4ade80;font-size:9px">NRR 103%</span>
+              <span style="color:#94a3b8;font-size:9px">↻ 200d</span>
+              <span style="color:#94a3b8;font-size:9px">NA</span>
+            </div>
+          </div>
+
+          <div style="background:#1e293b;border-radius:4px;padding:7px 9px;border-left:3px solid #334155;cursor:pointer">
+            <div style="display:flex;align-items:center;gap:5px">
+              <span style="background:#22c55e;color:#fff;font-size:8px;padding:1px 5px;border-radius:2px;font-weight:bold">P3</span>
+              <span style="color:#cbd5e1;font-size:10px">Umbrella Co</span>
+              <span style="margin-left:auto;color:#f59e0b;font-size:8px">pending</span>
+            </div>
+            <div style="display:flex;gap:10px;margin-top:3px">
+              <span style="color:#4ade80;font-size:9px">NRR 112%</span>
+              <span style="color:#94a3b8;font-size:9px">↻ 310d</span>
+              <span style="color:#94a3b8;font-size:9px">LATAM</span>
+            </div>
+          </div>
+
+          <div style="background:#1e293b;border-radius:4px;padding:7px 9px;border-left:3px solid #334155;cursor:pointer">
+            <div style="display:flex;align-items:center;gap:5px">
+              <span style="background:#22c55e;color:#fff;font-size:8px;padding:1px 5px;border-radius:2px;font-weight:bold">P3</span>
+              <span style="color:#cbd5e1;font-size:10px">Soylent Corp</span>
+              <span style="margin-left:auto;color:#f59e0b;font-size:8px">pending</span>
+            </div>
+            <div style="display:flex;gap:10px;margin-top:3px">
+              <span style="color:#4ade80;font-size:9px">NRR 108%</span>
+              <span style="color:#94a3b8;font-size:9px">↻ 280d</span>
+              <span style="color:#94a3b8;font-size:9px">APAC</span>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- Progress bar at bottom -->
+        <div style="padding:8px 12px;border-top:1px solid #334155;background:#1e293b">
+          <div style="display:flex;justify-content:space-between;margin-bottom:4px">
+            <span style="color:#94a3b8;font-size:9px">Progress</span>
+            <span style="color:#94a3b8;font-size:9px">12 / 47</span>
+          </div>
+          <div style="background:#334155;border-radius:10px;height:4px">
+            <div style="background:#3b82f6;width:26%;height:4px;border-radius:10px"></div>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- RIGHT PANEL: Detail Card -->
+      <div style="flex:1;display:flex;flex-direction:column;background:#0f172a">
+
+        <!-- Account header -->
+        <div style="padding:12px 16px;border-bottom:1px solid #1e293b;background:#1e293b">
+          <div style="display:flex;align-items:center;gap:8px">
+            <span style="background:#ef4444;color:#fff;font-size:9px;padding:2px 7px;border-radius:3px;font-weight:bold">P1</span>
+            <span style="color:#f1f5f9;font-size:13px;font-weight:600">Acme Corp</span>
+            <span style="color:#94a3b8;font-size:10px">APAC · Sarah Chen</span>
+            <div style="margin-left:auto;display:flex;gap:8px">
+              <span style="color:#f87171;font-size:10px">NRR 82%</span>
+              <span style="color:#f59e0b;font-size:10px">↻ 47d</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Score pills -->
+        <div style="padding:10px 16px;display:flex;gap:8px;border-bottom:1px solid #1e293b">
+          <div style="background:#1e293b;border-radius:4px;padding:5px 10px;text-align:center">
+            <div style="color:#f87171;font-size:11px;font-weight:600">32</div>
+            <div style="color:#64748b;font-size:8px;text-transform:uppercase">Composite</div>
+          </div>
+          <div style="background:#1e293b;border-radius:4px;padding:5px 10px;text-align:center">
+            <div style="color:#f87171;font-size:11px;font-weight:600">CRITICAL</div>
+            <div style="color:#64748b;font-size:8px;text-transform:uppercase">NRR</div>
+          </div>
+          <div style="background:#1e293b;border-radius:4px;padding:5px 10px;text-align:center">
+            <div style="color:#fbbf24;font-size:11px;font-weight:600">DUAL</div>
+            <div style="color:#64748b;font-size:8px;text-transform:uppercase">Threading</div>
+          </div>
+          <div style="background:#1e293b;border-radius:4px;padding:5px 10px;text-align:center">
+            <div style="color:#4ade80;font-size:11px;font-weight:600">HIGH</div>
+            <div style="color:#64748b;font-size:8px;text-transform:uppercase">Expansion</div>
+          </div>
+          <div style="background:#1e293b;border-radius:4px;padding:5px 10px;flex:1">
+            <div style="color:#94a3b8;font-size:9px;font-style:italic">NRR CRITICAL + renewal in 47d triggered P1 override</div>
+          </div>
+        </div>
+
+        <!-- Comment area -->
+        <div style="flex:1;padding:12px 16px;display:flex;flex-direction:column;gap:8px;overflow-y:auto">
+          <div style="display:flex;align-items:center;gap:6px">
+            <span style="color:#94a3b8;font-size:9px;text-transform:uppercase;letter-spacing:1px">CRO Comment</span>
+            <span style="color:#64748b;font-size:8px">claude-sonnet-4-6 · generated 2m ago</span>
+          </div>
+
+          <div style="background:#1e293b;border:1px solid #334155;border-radius:4px;padding:10px;color:#e2e8f0;font-size:10px;line-height:1.6;flex:1;min-height:120px">
+            Acme requires immediate executive intervention. NRR has deteriorated to 82% — below our CRITICAL threshold — with renewal in just 47 days. Despite strong expansion signals (HIGH opportunity across 6 channels), the risk of churn outweighs upside at this stage. I've flagged this for an emergency QBR with the regional VP. Sarah should lead with a retention-first narrative and defer any upsell conversation until renewal is secured.
+          </div>
+
+          <div style="display:flex;gap:6px">
+            <button style="background:#334155;border:none;color:#94a3b8;font-size:9px;padding:4px 10px;border-radius:3px;cursor:pointer">↺ Regenerate</button>
+            <button style="background:#334155;border:none;color:#94a3b8;font-size:9px;padding:4px 10px;border-radius:3px;cursor:pointer">✎ Edit</button>
+          </div>
+        </div>
+
+        <!-- Action bar -->
+        <div style="padding:12px 16px;border-top:1px solid #1e293b;background:#1e293b;display:flex;gap:8px;align-items:center">
+          <button style="background:#22c55e;border:none;color:#fff;font-size:11px;font-weight:600;padding:8px 20px;border-radius:4px;cursor:pointer">✓ Approve</button>
+          <button style="background:#334155;border:none;color:#94a3b8;font-size:11px;padding:8px 16px;border-radius:4px;cursor:pointer">– Skip</button>
+          <span style="color:#64748b;font-size:9px;margin-left:auto">← → to navigate</span>
+        </div>
+
+      </div>
+    </div>
+  </div>
+</div>
+
+<div style="margin-top:16px" class="section">
+  <p class="subtitle" style="color:#94a3b8">Key changes vs. current design: persistent left panel replaces full-page navigation · Approve/Skip always visible at card bottom · NRR + renewal + region visible without opening detail · keyboard nav hints</p>
+</div>
