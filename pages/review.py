@@ -364,13 +364,15 @@ def _get_filtered_account_list(
     Applies left-panel filters (search + tier) on top of whatever sidebar
     filters already produced session.review_order.
     """
+    # Build a one-time lookup: account_key -> row, to avoid O(n²) _find_account_row calls
+    key_to_row = {get_account_key(row): row for _, row in scored_df.iterrows()}
+
     search = list_search.strip().lower()
     keys = []
     for key in session.review_order:
-        row_df = _find_account_row(scored_df, key)
-        if row_df is None:
+        row = key_to_row.get(key)
+        if row is None:
             continue
-        row = row_df.iloc[0]
         account_name = str(row.get("account_name", "")).lower()
         tier = str(row.get("attention_tier", ""))
 
@@ -391,8 +393,15 @@ def _next_pending_key(
     Return the next key after current_key in filtered_keys that has no decision yet.
 
     `decisions` is session.decisions — a dict keyed by account_key.
-    Returns None if no pending account exists.
+    Returns None if no pending account exists in filtered_keys.
+
+    If current_key is not in filtered_keys (e.g. it was filtered out), returns
+    the first pending key in filtered_keys, or None if all are decided.
     """
+    if current_key not in filtered_keys:
+        # Selected account is no longer visible — return the first pending key
+        return next((k for k in filtered_keys if k not in decisions), None)
+
     found_current = False
     for key in filtered_keys:
         if key == current_key:
