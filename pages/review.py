@@ -431,6 +431,164 @@ def _resolve_selected_key(
     return filtered_keys[0] if filtered_keys else None
 
 
+def _nrr_colour(nrr_display: str) -> str:
+    """Return a CSS hex colour for the NRR value. Red < 90, yellow 90-99, green >= 100."""
+    try:
+        val = float(str(nrr_display).replace("%", "").replace("N/A", "").strip())
+        if val < 90:
+            return "#f87171"   # red
+        if val < 100:
+            return "#fbbf24"   # yellow
+        return "#4ade80"       # green
+    except (ValueError, TypeError):
+        return "#94a3b8"       # grey for N/A
+
+
+def _render_left_panel(
+    scored_df: pd.DataFrame,
+    session: "SessionState",
+) -> None:
+    """
+    Render the left-panel account list.
+
+    Reads/writes:
+      st.session_state["list_search"]
+      st.session_state["list_tier_filter"]
+      st.session_state["selected_account_key"]
+    """
+    decisions = session.decisions
+    total = len(session.review_order)
+    done = session.approved_count() + session.skipped_count()
+
+    # ── Header
+    st.markdown(
+        f"**Accounts** &nbsp; "
+        f"<span style='background:#334155;color:#94a3b8;font-size:0.75rem;"
+        f"padding:1px 7px;border-radius:10px'>{total}</span>"
+        f"&nbsp;&nbsp;"
+        f"<span style='color:#4ade80;font-size:0.8rem'>{done} done</span>",
+        unsafe_allow_html=True,
+    )
+
+    # ── Filters
+    search = st.text_input(
+        "Search accounts",
+        value=st.session_state.get("list_search", ""),
+        key="list_search",
+        placeholder="filter by name…",
+        label_visibility="collapsed",
+    )
+    tier_filter = st.radio(
+        "Tier",
+        options=["All", "P1", "P2", "P3"],
+        index=["All", "P1", "P2", "P3"].index(
+            st.session_state.get("list_tier_filter", "All")
+        ),
+        horizontal=True,
+        key="list_tier_filter",
+        label_visibility="collapsed",
+    )
+
+    # ── Build filtered list and resolve selection
+    filtered_keys = _get_filtered_account_list(scored_df, session, search, tier_filter)
+    selected_key = _resolve_selected_key(
+        filtered_keys, st.session_state.get("selected_account_key")
+    )
+    st.session_state["selected_account_key"] = selected_key
+
+    # ── Empty state
+    if not filtered_keys:
+        st.markdown(
+            "<div style='text-align:center;color:#64748b;padding:2rem 0'>"
+            "No accounts match your filters.</div>",
+            unsafe_allow_html=True,
+        )
+        _render_left_panel_footer(done, total)
+        return
+
+    # ── Account rows
+    with st.container(height=480):
+        for key in filtered_keys:
+            row_df = _find_account_row(scored_df, key)
+            if row_df is None:
+                continue
+            row = row_df.iloc[0]
+
+            account_name = str(row.get("account_name", key)).strip()
+            tier = str(row.get("attention_tier", "P3"))
+            nrr_display = str(row.get("nrr_display") or row.get("nrr") or "N/A")
+            renewal_date = str(row.get("renewal_date", "N/A") or "N/A").strip()
+            region = str(row.get("region", "")).strip()
+
+            # Decision status
+            decision = decisions.get(key)
+            if decision and decision.status == "approved":
+                status_html = "<span style='color:#22c55e;font-size:0.75rem'>✓ approved</span>"
+                border_colour = "#22c55e"
+            elif decision and decision.status == "skipped":
+                status_html = "<span style='color:#f97316;font-size:0.75rem'>– skipped</span>"
+                border_colour = "#f97316"
+            else:
+                status_html = "<span style='color:#f59e0b;font-size:0.75rem'>pending</span>"
+                border_colour = "#3b82f6" if key == selected_key else "transparent"
+
+            # Tier badge colour
+            tier_colour = {"P1": "#ef4444", "P2": "#f59e0b", "P3": "#22c55e"}.get(tier, "#6b7280")
+            nrr_colour = _nrr_colour(nrr_display)
+
+            # Renewal days countdown (pd is imported at top of file)
+            renewal_display = "N/A"
+            try:
+                rd = pd.to_datetime(renewal_date, errors="coerce")
+                if not pd.isna(rd):
+                    days = (rd - pd.Timestamp.now()).days
+                    renewal_display = f"↻ {days}d" if days >= 0 else f"↻ {days}d (overdue)"
+            except Exception:
+                renewal_display = renewal_date
+
+            row_html = f"""
+            <div style="
+                border-left: 3px solid {border_colour};
+                background: {'#0f3460' if key == selected_key else '#1e293b'};
+                border-radius: 4px;
+                padding: 7px 9px;
+                margin-bottom: 3px;
+            ">
+              <div style="display:flex;align-items:center;gap:6px">
+                <span style="background:{tier_colour};color:#fff;font-size:0.7rem;
+                             padding:1px 5px;border-radius:2px;font-weight:bold">{tier}</span>
+                <span style="color:{'#fff' if key == selected_key else '#cbd5e1'};
+                             font-size:0.85rem;font-weight:{'600' if key == selected_key else '400'}"
+                >{account_name}</span>
+                <span style="margin-left:auto">{status_html}</span>
+              </div>
+              <div style="display:flex;gap:10px;margin-top:3px">
+                <span style="color:{nrr_colour};font-size:0.75rem">NRR {nrr_display}</span>
+                <span style="color:#94a3b8;font-size:0.75rem">{renewal_display}</span>
+                <span style="color:#94a3b8;font-size:0.75rem">{region}</span>
+              </div>
+            </div>
+            """
+
+            if st.button(
+                account_name,
+                key=f"row_btn_{key}",
+                use_container_width=True,
+            ):
+                st.session_state["selected_account_key"] = key
+                st.rerun()
+
+            st.markdown(row_html, unsafe_allow_html=True)
+
+    _render_left_panel_footer(done, total)
+
+
+def _render_left_panel_footer(done: int, total: int) -> None:
+    progress = done / total if total > 0 else 0
+    st.progress(progress)
+    st.caption(f"{done} / {total} reviewed")
+
+
 def _get_or_generate_comment(row: pd.Series, scoring: dict, account_key: str, model: str) -> str:
     """Return cached comment or generate a new one."""
     comments = st.session_state.get("generated_comments", {})
