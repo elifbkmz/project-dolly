@@ -2,13 +2,13 @@
 Review Card component — the centerpiece of the demo.
 
 Renders one account card with:
-- Header: name, region, attention tier badge, position counter
+- Header: name, region, attention tier badge
 - Financial metrics: ARR, NRR, Renewal, Health, Stage
 - Threading + Expansion badges
 - Tech Stake breakdown (expandable)
 - Risk flags (expandable)
 - Editable CRO comment text area
-- Buttons: Approve, Regenerate, Skip, Save to Master
+- Button: Regenerate (Approve, Skip, Save are rendered by the caller)
 """
 
 import streamlit as st
@@ -33,29 +33,18 @@ def load_css():
 def render_review_card(
     row: pd.Series,
     scoring: dict,
-    position: int,
-    total: int,
+    account_key: str,
     generated_comment: str,
-    on_approve,
     on_regenerate,
-    on_skip,
-    on_save_to_master,
     approved_count: int = 0,
-) -> None:
+    model: str = "claude-sonnet-4-6",
+) -> str:
     """
-    Render the full account Review Card.
+    Render the account detail section (header, metrics, badges, tech stake,
+    risk flags, comment text area).
 
-    Args:
-        row: Account row from scored DataFrame.
-        scoring: Scoring dict for this account.
-        position: Current position (1-indexed).
-        total: Total accounts in this review session.
-        generated_comment: AI-generated comment text.
-        on_approve:         Callable(final_comment: str, was_edited: bool)
-        on_regenerate:      Callable()
-        on_skip:            Callable()
-        on_save_to_master:  Callable()
-        approved_count:     Number of approved comments not yet saved to Sheets.
+    Returns the current text in the comment text area (may be edited by user).
+    Action buttons (Approve, Skip, Save) are rendered by the caller.
     """
     load_css()
 
@@ -69,7 +58,7 @@ def render_review_card(
 
     # ── Header ────────────────────────────────────────────────────────────
     tier_html = attention_tier_badge(attention_tier)
-    region_meta = f"{region} &nbsp;·&nbsp; Account {position} of {total}"
+    region_meta = region
     st.markdown(
         f"""
         <div style="display:flex; justify-content:space-between; align-items:center;
@@ -122,11 +111,11 @@ def render_review_card(
 
     # ── CRO Comment ───────────────────────────────────────────────────────
     st.markdown("---")
-    st.markdown("**🤖 CRO Suggested Comment** *(claude-sonnet-4-6)*")
+    st.markdown(f"**🤖 CRO Suggested Comment** *({model})*")
 
     # State keys scoped to this account
-    comment_area_key = f"comment_area_{account_name}_{position}"
-    regen_count_key = f"regen_{account_name}_{position}"
+    comment_area_key = f"comment_area_{account_key}"
+    regen_count_key = f"regen_{account_key}"
 
     # Pre-populate the text area with the generated comment on first render
     if comment_area_key not in st.session_state:
@@ -141,38 +130,16 @@ def render_review_card(
     )
     was_edited = edited_comment.strip() != generated_comment.strip()
 
-    # ── Pending save banner ───────────────────────────────────────────────
-    if approved_count > 0:
-        st.info(
-            f"💾 **{approved_count} approved comment(s) not yet written to Google Sheets.** "
-            f"Click **Save {approved_count} to Sheets** below anytime, or continue reviewing first.",
-            icon="💡",
-        )
-
-    # ── Action buttons ────────────────────────────────────────────────────
-    b1, b2, b3, b4 = st.columns([2.5, 2, 1.5, 2.5])
-
-    with b1:
-        if st.button("✅ Approve & Next →", key=f"approve_{position}", use_container_width=True, type="primary"):
-            on_approve(edited_comment.strip(), was_edited)
-
-    with b2:
-        if st.button("🔄 Regenerate", key=f"regen_{position}", use_container_width=True):
-            st.session_state[regen_count_key] = st.session_state.get(regen_count_key, 0) + 1
-            on_regenerate()
-
-    with b3:
-        if st.button("⏭️ Skip", key=f"skip_{position}", use_container_width=True):
-            on_skip()
-
-    with b4:
-        save_label = f"💾 Save {approved_count} to Sheets" if approved_count > 0 else "💾 Save to Sheets"
-        if st.button(save_label, key=f"save_{position}", use_container_width=True):
-            on_save_to_master()
+    # ── Regenerate button
+    if st.button("🔄 Regenerate", key=f"regen_btn_{account_key}"):
+        st.session_state[regen_count_key] = st.session_state.get(regen_count_key, 0) + 1
+        on_regenerate()
 
     regen_count = st.session_state.get(regen_count_key, 0)
     if regen_count > 0:
         st.caption(f"🔄 Regenerated {regen_count} time(s)")
+
+    return edited_comment
 
 
 def _fmt_currency(value) -> str:
