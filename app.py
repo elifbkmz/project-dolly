@@ -96,6 +96,23 @@ def main():
             )
             st.stop()
 
+    # Welcome banner — shown once per session for first-time orientation
+    if not st.session_state.get("welcome_dismissed"):
+        scored_df_local = st.session_state["scored_df"]
+        total = len(scored_df_local)
+        p1 = int((scored_df_local["attention_tier"] == "P1").sum()) if "attention_tier" in scored_df_local.columns else 0
+        p2 = int((scored_df_local["attention_tier"] == "P2").sum()) if "attention_tier" in scored_df_local.columns else 0
+        st.info(
+            f"**Welcome to the Global Account Review Agent**\n\n"
+            f"Your portfolio has **{total} accounts** scored and prioritized. "
+            f"**{p1} critical** and **{p2} at-risk** need your attention. "
+            f"Start with the **Account Review** tab to review and approve CRO comments, "
+            f"then save back to Sheets."
+        )
+        if st.button("Got it", key="dismiss_welcome"):
+            st.session_state["welcome_dismissed"] = True
+            st.rerun()
+
     # Tab navigation
     tab1, tab2, tab3 = st.tabs(["🔍 Account Review", "📊 Risk Dashboard", "📄 Report"])
 
