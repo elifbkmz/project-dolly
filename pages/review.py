@@ -134,7 +134,9 @@ def _save_to_master(session: SessionState, scored_df: pd.DataFrame):
         by_sheet: dict[str, dict[str, str]] = defaultdict(dict)
         for key, decision in approved.items():
             if decision.final_comment and decision.spreadsheet_id:
-                account_name = key.split("::", 1)[-1]
+                # Key format: REGION::AccountName or REGION::AccountName::AE
+                parts = key.split("::")
+                account_name = parts[1] if len(parts) >= 2 else key
                 by_sheet[decision.spreadsheet_id][account_name] = decision.final_comment
 
         # Determine target write tab from config
@@ -236,7 +238,14 @@ def _initialize_session(scored_df: pd.DataFrame, filters: dict):
         st.warning("No accounts match the selected filters. Adjust filters and try again.")
         return
 
-    review_order = [get_account_key(row) for _, row in df.iterrows()]
+    # Deduplicate: same account can appear in multiple rows if data has overlaps
+    seen = set()
+    review_order = []
+    for _, row in df.iterrows():
+        k = get_account_key(row)
+        if k not in seen:
+            seen.add(k)
+            review_order.append(k)
     model = st.session_state.get("selected_model", "claude-sonnet-4-6")
     regions_loaded = sorted(scored_df["region"].unique().tolist()) if "region" in scored_df.columns else []
 
@@ -311,7 +320,7 @@ def _next_pending_key(
     filtered_keys: list[str],
     current_key: str,
     decisions: dict,
-) -> str | None:
+) -> Optional[str]:
     """
     Return the next key after current_key in filtered_keys that has no decision yet.
 
@@ -343,8 +352,8 @@ def _next_pending_key(
 
 def _resolve_selected_key(
     filtered_keys: list[str],
-    current_selected: str | None,
-) -> str | None:
+    current_selected: Optional[str],
+) -> Optional[str]:
     """
     Return current_selected if it is still in filtered_keys.
     Otherwise return the first key in filtered_keys, or None if empty.
@@ -431,17 +440,21 @@ def _render_left_panel(
 
     # ── Account rows
     with st.container(height=480):
-        for key in filtered_keys:
+        for idx, key in enumerate(filtered_keys):
             row_df = _find_account_row(scored_df, key)
             if row_df is None:
                 continue
             row = row_df.iloc[0]
 
             account_name = str(row.get("account_name", key)).strip()
+            ae_name = str(row.get("ae_name", "") or "").strip()
+            ae_name = ae_name if ae_name.lower() not in ("nan", "n/a", "none", "") else ""
             tier = str(row.get("attention_tier", "P3"))
             nrr_display = str(row.get("nrr_display") or row.get("nrr") or "N/A")
             renewal_date = str(row.get("renewal_date", "N/A") or "N/A").strip()
             region = str(row.get("region", "")).strip()
+            primary_signal = str(row.get("primary_signal", "")).strip()
+            primary_signal = primary_signal if primary_signal.lower() not in ("nan", "n/a", "none", "") else ""
 
             # Decision status
             decision = decisions.get(key)
@@ -485,17 +498,19 @@ def _render_left_panel(
                 >{account_name}</span>
                 <span style="margin-left:auto">{status_html}</span>
               </div>
-              <div style="display:flex;gap:10px;margin-top:3px">
+              <div style="display:flex;gap:10px;margin-top:3px;flex-wrap:wrap">
+                {f'<span style="color:#6ea8fe;font-size:0.72rem">AE: {ae_name}</span>' if ae_name else ''}
                 <span style="color:{nrr_colour};font-size:0.75rem">NRR {nrr_display}</span>
                 <span style="color:#94a3b8;font-size:0.75rem">{renewal_display}</span>
                 <span style="color:#94a3b8;font-size:0.75rem">{region}</span>
               </div>
+              {'<div style="font-size:0.7rem;color:#94a3b8;font-style:italic;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:2px">' + primary_signal + '</div>' if primary_signal else ''}
             </div>
             """
 
             if st.button(
                 account_name,
-                key=f"row_btn_{key}",
+                key=f"row_btn_{idx}",
                 use_container_width=True,
             ):
                 st.session_state["selected_account_key"] = key
@@ -683,7 +698,7 @@ def _get_or_generate_comment(row: pd.Series, scoring: dict, account_key: str, mo
     if account_key in comments:
         return comments[account_key]
 
-    with st.spinner(f"Generating CRO comment for {account_key.split('::')[-1]}..."):
+    with st.spinner(f"Generating CRO comment for {account_key.split('::')[1] if '::' in account_key else account_key}..."):
         try:
             client = get_anthropic_client()
             templates = load_prompt_templates()
