@@ -106,6 +106,59 @@ def render_dashboard_page():
             "composite_score": "Score",
         }), use_container_width=True, hide_index=True)
 
+    st.divider()
+    _render_scoring_explainer()
+
+
+def _render_scoring_explainer():
+    """Render a 'How Scoring Works' reference section."""
+    st.markdown("### How Scoring Works")
+    st.markdown(
+        "Each account receives a **composite risk score** (0–100) that determines "
+        "its priority tier. The score combines three independent dimensions:"
+    )
+
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        st.markdown(
+            "**NRR Risk (50%)**\n\n"
+            "Net Revenue Retention measures whether the account is growing or shrinking.\n\n"
+            "- Below 90% → CRITICAL\n"
+            "- 90–99% → AT RISK\n"
+            "- 100–109% → HEALTHY\n"
+            "- 110%+ → STRONG"
+        )
+    with col2:
+        st.markdown(
+            "**Threading Risk (25%)**\n\n"
+            "How many executive contacts you have. Fewer contacts = higher risk.\n\n"
+            "- 0–1 contacts → SINGLE (high risk)\n"
+            "- 2 contacts → DUAL\n"
+            "- 3+ contacts → MULTI (low risk)"
+        )
+    with col3:
+        st.markdown(
+            "**Expansion Opportunity (25%)**\n\n"
+            "How many product channels are uncaptured or competitor-held.\n\n"
+            "- Score 60+ → HIGH opportunity\n"
+            "- Score 30–59 → MEDIUM\n"
+            "- Below 30 → LOW"
+        )
+
+    st.markdown("**Priority Tiers**")
+    st.markdown(
+        "| Tier | Rule |\n"
+        "|---|---|\n"
+        "| 🔴 **P1 — Immediate** | Composite score >= 65, **OR** any hard override |\n"
+        "| 🟡 **P2 — Monitor** | Composite score 40–64 |\n"
+        "| 🟢 **P3 — On Track** | Composite score < 40 |"
+    )
+
+    st.markdown(
+        "**Hard overrides** force P1 regardless of score: "
+        "NRR below 90% (CRITICAL), renewal within 90 days, or health score <= 2."
+    )
+
 
 def _avg_nrr(df: pd.DataFrame) -> str:
     if "nrr_raw" not in df.columns:
