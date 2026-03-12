@@ -1,14 +1,15 @@
 """
 Review Card component — the centerpiece of the demo.
 
-Renders one account card with:
-- Header: name, region, attention tier badge
-- Financial metrics: ARR, NRR, Renewal, Health, Stage
-- Threading + Expansion badges
-- Tech Stake breakdown (expandable)
-- Risk flags (expandable)
-- Editable CRO comment text area
-- Button: Regenerate (Approve, Skip, Save are rendered by the caller)
+Renders one account card with a story-first layout:
+- Header: tier badge, account name, AE, region
+- Risk Summary: plain-language summary of why this account matters
+- Key Facts: ARR, NRR, Renewal Date, Contacts (2x2 metrics)
+- CRO Comment: divider, model label, text_area, regenerate button
+- Scoring Details (collapsed): NRR badge, threading+expansion badges,
+  tech stake chips, risk flags, deal stage/NRR tier/health caption
+
+Action buttons (Approve, Skip, Save) are rendered by the caller.
 """
 
 import streamlit as st
@@ -20,6 +21,7 @@ from ui.components.risk_badges import (
     expansion_badge, build_risk_flags,
 )
 from ui.components.tech_stake_chart import render_channel_chips
+from ui.components.risk_summary import build_risk_summary
 
 
 def load_css():
@@ -40,8 +42,7 @@ def render_review_card(
     model: str = "claude-sonnet-4-6",
 ) -> str:
     """
-    Render the account detail section (header, metrics, badges, tech stake,
-    risk flags, comment text area).
+    Render the account detail section using a story-first layout.
 
     Returns the current text in the comment text area (may be edited by user).
     Action buttons (Approve, Skip, Save) are rendered by the caller.
@@ -56,7 +57,7 @@ def render_review_card(
     nrr_display = scoring.get("nrr_display", "N/A")
     nrr_tier = scoring.get("nrr_tier", "UNKNOWN")
 
-    # ── Header ────────────────────────────────────────────────────────────
+    # ── 1. Header ─────────────────────────────────────────────────────────
     tier_html = attention_tier_badge(attention_tier)
     region_meta = region
     st.markdown(
@@ -79,45 +80,37 @@ def render_review_card(
         unsafe_allow_html=True,
     )
 
-    # ── Financial metrics ─────────────────────────────────────────────────
+    # ── 2. Risk Summary ───────────────────────────────────────────────────
+    _tier_colors = {"P1": "#dc3545", "P2": "#fd7e14", "P3": "#198754"}
+    border_color = _tier_colors.get(attention_tier, "#6c757d")
+    risk_text = build_risk_summary(row, scoring)
+    st.markdown(
+        f'<div class="risk-summary" style="border-left-color:{border_color};">'
+        f"{risk_text}</div>",
+        unsafe_allow_html=True,
+    )
+
+    # ── 3. Key Facts ──────────────────────────────────────────────────────
     arr_display = _fmt_currency(row.get("arr"))
     renewal_date = str(row.get("renewal_date", "N/A")).strip() or "N/A"
-    health_raw = str(row.get("health_score", "")).strip()
-    health_display = health_raw if health_raw and health_raw not in ("nan", "") else "N/A"
-    deal_stage = str(row.get("deal_stage", "N/A")).strip() or "N/A"
+    contact_count = scoring.get("contact_count")
+    contacts_display = str(contact_count) if contact_count is not None else "N/A"
 
-    m1, m2, m3, m4 = st.columns(4)
-    m1.metric("💰 ARR", arr_display)
-    m2.metric("📈 NRR", f"{nrr_display}")
-    m3.metric("📅 Renewal", renewal_date)
-    m4.metric("💊 Health", health_display)
-    st.caption(f"**Stage:** {deal_stage} &nbsp;|&nbsp; **NRR Tier:** {nrr_tier}")
+    r1c1, r1c2 = st.columns(2)
+    r1c1.metric("ARR", arr_display)
+    r1c2.metric("NRR", str(nrr_display))
 
-    # ── Status badges ─────────────────────────────────────────────────────
-    badges_html = (
-        threading_badge(scoring.get("threading_tier", "UNKNOWN"), scoring.get("contact_count"))
-        + "&nbsp;&nbsp;"
-        + expansion_badge(scoring.get("expansion_tier", "LOW"), float(scoring.get("expansion_score", 0) or 0))
-    )
-    st.markdown(f"<div style='margin:0.5rem 0;'>{badges_html}</div>", unsafe_allow_html=True)
+    r2c1, r2c2 = st.columns(2)
+    r2c1.metric("Renewal Date", renewal_date)
+    r2c2.metric("Contacts", contacts_display)
 
-    # ── Tech Stake breakdown ──────────────────────────────────────────────
-    with st.expander("📦 Tech Stake Breakdown", expanded=True):
-        st.markdown(render_channel_chips(scoring), unsafe_allow_html=True)
-
-    # ── Risk flags ────────────────────────────────────────────────────────
-    with st.expander("⚠️ Risk & Opportunity Profile", expanded=True):
-        st.markdown(build_risk_flags(scoring), unsafe_allow_html=True)
-
-    # ── CRO Comment ───────────────────────────────────────────────────────
+    # ── 4. CRO Comment ────────────────────────────────────────────────────
     st.markdown("---")
-    st.markdown(f"**🤖 CRO Suggested Comment** *({model})*")
+    st.markdown(f"**CRO Suggested Comment** *({model})*")
 
-    # State keys scoped to this account
     comment_area_key = f"comment_area_{account_key}"
     regen_count_key = f"regen_{account_key}"
 
-    # Pre-populate the text area with the generated comment on first render
     if comment_area_key not in st.session_state:
         st.session_state[comment_area_key] = generated_comment
 
@@ -128,16 +121,38 @@ def render_review_card(
         key=comment_area_key,
         help="The AI-generated comment. Modify freely before approving.",
     )
-    was_edited = edited_comment.strip() != generated_comment.strip()
 
-    # ── Regenerate button
-    if st.button("🔄 Regenerate", key=f"regen_btn_{account_key}"):
+    if st.button("Regenerate", key=f"regen_btn_{account_key}"):
         st.session_state[regen_count_key] = st.session_state.get(regen_count_key, 0) + 1
         on_regenerate()
 
     regen_count = st.session_state.get(regen_count_key, 0)
     if regen_count > 0:
-        st.caption(f"🔄 Regenerated {regen_count} time(s)")
+        st.caption(f"Regenerated {regen_count} time(s)")
+
+    # ── 5. Scoring Details (collapsed) ────────────────────────────────────
+    deal_stage = str(row.get("deal_stage", "N/A")).strip() or "N/A"
+    health_raw = str(row.get("health_score", "")).strip()
+    health_display = health_raw if health_raw and health_raw not in ("nan", "") else "N/A"
+
+    with st.expander("Scoring Details", expanded=False):
+        nrr_html = nrr_badge(nrr_display, scoring.get("nrr_tier", "UNKNOWN"))
+        badges_html = (
+            nrr_html
+            + "&nbsp;&nbsp;"
+            + threading_badge(scoring.get("threading_tier", "UNKNOWN"), contact_count)
+            + "&nbsp;&nbsp;"
+            + expansion_badge(
+                scoring.get("expansion_tier", "LOW"),
+                float(scoring.get("expansion_score", 0) or 0),
+            )
+        )
+        st.markdown(f"<div style='margin:0.5rem 0;'>{badges_html}</div>", unsafe_allow_html=True)
+        st.markdown(render_channel_chips(scoring), unsafe_allow_html=True)
+        st.markdown(build_risk_flags(scoring), unsafe_allow_html=True)
+        st.caption(
+            f"**Stage:** {deal_stage} &nbsp;|&nbsp; **NRR Tier:** {nrr_tier} &nbsp;|&nbsp; **Health:** {health_display}"
+        )
 
     return edited_comment
 
