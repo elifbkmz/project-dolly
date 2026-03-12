@@ -45,94 +45,20 @@ def render_review_page():
 
     session: SessionState = st.session_state["session"]
 
-    # ── Model selection (top of page) ─────────────────────────────────────
-    col_model, col_info = st.columns([2, 5])
-    with col_model:
-        model = st.selectbox(
-            "Claude Model",
-            options=["claude-sonnet-4-6", "claude-opus-4-6"],
-            index=0,
-            key="selected_model",
-        )
+    # ── Two-panel layout
+    left_col, right_col = st.columns([1, 2])
 
-    with col_info:
-        p1_count = (scored_df["attention_tier"] == "P1").sum() if "attention_tier" in scored_df.columns else 0
-        p2_count = (scored_df["attention_tier"] == "P2").sum() if "attention_tier" in scored_df.columns else 0
-        st.info(
-            f"**{len(scored_df)} total accounts** across "
-            f"{scored_df['region'].nunique() if 'region' in scored_df.columns else '?'} regions "
-            f"| 🔴 P1: {p1_count} &nbsp; 🟡 P2: {p2_count}"
-        )
+    with left_col:
+        _render_left_panel(scored_df, session)
 
-    st.divider()
-
-    # ── Check if session is complete ──────────────────────────────────────
-    if session.is_complete():
-        st.success(
-            f"✅ Review complete! {session.approved_count()} approved, "
-            f"{session.skipped_count()} skipped."
-        )
-        if st.button("💾 Save to Master Sheets & Generate Report"):
-            _save_to_master(session, scored_df)
-        return
-
-    # ── Get current account ───────────────────────────────────────────────
-    current_key = session.current_account_key()
-    if not current_key:
-        st.error("Session state error: no current account key.")
-        return
-
-    # Find the row for the current account
-    account_df = _find_account_row(scored_df, current_key)
-    if account_df is None:
-        st.error(f"Account '{current_key}' not found in data. Skipping.")
-        st.session_state["session"] = record_decision(
-            session, current_key, "skipped"
-        )
-        save_session(session, DEFAULT_SESSION_DIR)
-        st.rerun()
-        return
-
-    row = account_df.iloc[0]
-    scoring = _extract_scoring_from_row(row)
-
-    # Backfill insider_channels if the scored_df pre-dates this feature
-    # (column won't exist in old cached DataFrames — recompute on the fly)
-    if not scoring.get("insider_channels"):
-        from src.scoring.expansion_scorer import score_expansion
-        fresh_exp = score_expansion(row)
-        scoring["insider_channels"] = fresh_exp.get("insider_channels", [])
-        if not scoring.get("insider_product_count"):
-            scoring["insider_product_count"] = fresh_exp.get("insider_product_count", 0)
-        if not scoring.get("competitor_channels"):
-            scoring["competitor_channels"] = fresh_exp.get("competitor_channels", [])
-        if not scoring.get("whitespace_channels"):
-            scoring["whitespace_channels"] = fresh_exp.get("whitespace_channels", [])
-
-    # ── Generate or retrieve comment ──────────────────────────────────────
-    comment = _get_or_generate_comment(row, scoring, current_key, model)
-
-    # ── Render the Review Card ────────────────────────────────────────────
-    render_review_card(
-        row=row,
-        scoring=scoring,
-        position=session.current_index + 1,
-        total=session.total_accounts,
-        generated_comment=comment,
-        on_approve=lambda final, edited: _handle_approve(
-            session, current_key, final, comment, edited, row
-        ),
-        on_regenerate=lambda: _handle_regenerate(current_key, row, scoring, model),
-        on_skip=lambda: _handle_skip(session, current_key),
-        on_save_to_master=lambda: _save_to_master(session, scored_df),
-        approved_count=session.approved_count(),
-    )
+    with right_col:
+        _render_right_panel(scored_df, session)
 
 
 # ── Action handlers ───────────────────────────────────────────────────────────
 
 def _handle_approve(session, account_key, final_comment, original_comment, edited, row):
-    regen_count = st.session_state.get(f"regen_{row.get('account_name', '')}_{session.current_index + 1}", 0)
+    regen_count = st.session_state.get(f"regen_{account_key}", 0)
     spreadsheet_id = str(row.get("spreadsheet_id", "")) or None
 
     st.session_state["session"] = record_decision(
@@ -146,10 +72,9 @@ def _handle_approve(session, account_key, final_comment, original_comment, edite
         spreadsheet_id=spreadsheet_id,
     )
     save_session(st.session_state["session"], DEFAULT_SESSION_DIR)
-    account_name = account_key.split("::", 1)[-1]
     approved_so_far = st.session_state["session"].approved_count()
     st.toast(f"✅ Approved ({approved_so_far} total) — loading next account…", icon="✅")
-    st.rerun()
+    # NOTE: no st.rerun() here — caller handles it after updating selected_account_key
 
 
 def _handle_skip(session, account_key):
@@ -157,7 +82,7 @@ def _handle_skip(session, account_key):
         session, account_key=account_key, status="skipped"
     )
     save_session(st.session_state["session"], DEFAULT_SESSION_DIR)
-    st.rerun()
+    # NOTE: no st.rerun() here — caller handles it after updating selected_account_key
 
 
 def _handle_regenerate(account_key, row, scoring, model):
@@ -184,9 +109,7 @@ def _handle_regenerate(account_key, row, scoring, model):
             st.session_state["generated_comments"] = comments
 
             # Update the text area value
-            account_name = str(row.get("account_name", ""))
-            position = st.session_state["session"].current_index + 1
-            st.session_state[f"comment_area_{account_name}_{position}"] = new_comment
+            st.session_state[f"comment_area_{account_key}"] = new_comment
             st.rerun()
         except Exception as exc:
             st.error(f"Regeneration failed: {exc}")
@@ -587,6 +510,171 @@ def _render_left_panel_footer(done: int, total: int) -> None:
     progress = done / total if total > 0 else 0
     st.progress(progress)
     st.caption(f"{done} / {total} reviewed")
+
+
+def _render_right_panel(scored_df: pd.DataFrame, session: "SessionState") -> None:
+    """Render the right panel: model selector, account detail card, and action bar."""
+
+    # ── Model selector + info banner
+    col_model, col_info = st.columns([2, 5])
+    with col_model:
+        model = st.selectbox(
+            "Claude Model",
+            options=["claude-sonnet-4-6", "claude-opus-4-6"],
+            index=0,
+            key="selected_model",
+        )
+    with col_info:
+        p1_count = (scored_df["attention_tier"] == "P1").sum() if "attention_tier" in scored_df.columns else 0
+        p2_count = (scored_df["attention_tier"] == "P2").sum() if "attention_tier" in scored_df.columns else 0
+        st.info(
+            f"**{len(scored_df)} total accounts** across "
+            f"{scored_df['region'].nunique() if 'region' in scored_df.columns else '?'} regions "
+            f"| 🔴 P1: {p1_count} &nbsp; 🟡 P2: {p2_count}"
+        )
+
+    # ── Resolve selected account
+    selected_key = st.session_state.get("selected_account_key")
+
+    if not selected_key:
+        st.markdown(
+            "<div style='text-align:center;color:#64748b;padding:4rem 0'>"
+            "Select an account from the list.</div>",
+            unsafe_allow_html=True,
+        )
+        return
+
+    # ── Check for completion within filtered list
+    list_search = st.session_state.get("list_search", "")
+    list_tier_filter = st.session_state.get("list_tier_filter", "All")
+    filtered_keys = _get_filtered_account_list(scored_df, session, list_search, list_tier_filter)
+    pending_in_filter = [k for k in filtered_keys if k not in session.decisions]
+
+    if not pending_in_filter and selected_key in session.decisions:
+        st.success(
+            "✅ All filtered accounts reviewed. "
+            "Change filters or return to the dashboard."
+        )
+        if st.button("💾 Save to Master Sheets"):
+            _save_to_master(session, scored_df)
+        return
+
+    # ── Load account data
+    account_df = _find_account_row(scored_df, selected_key)
+    if account_df is None:
+        st.error(f"Account '{selected_key}' not found in data.")
+        return
+
+    row = account_df.iloc[0]
+    scoring = _extract_scoring_from_row(row)
+
+    # Backfill expansion scoring for old cached DataFrames
+    if not scoring.get("insider_channels"):
+        from src.scoring.expansion_scorer import score_expansion
+        fresh_exp = score_expansion(row)
+        scoring["insider_channels"] = fresh_exp.get("insider_channels", [])
+        if not scoring.get("insider_product_count"):
+            scoring["insider_product_count"] = fresh_exp.get("insider_product_count", 0)
+        if not scoring.get("competitor_channels"):
+            scoring["competitor_channels"] = fresh_exp.get("competitor_channels", [])
+        if not scoring.get("whitespace_channels"):
+            scoring["whitespace_channels"] = fresh_exp.get("whitespace_channels", [])
+
+    # ── Generate or retrieve comment
+    comment = _get_or_generate_comment(row, scoring, selected_key, model)
+
+    # ── Detail card (header, metrics, badges, comment text area)
+    edited_comment = render_review_card(
+        row=row,
+        scoring=scoring,
+        account_key=selected_key,
+        generated_comment=comment,
+        on_regenerate=lambda: _handle_regenerate(selected_key, row, scoring, model),
+        approved_count=session.approved_count(),
+        model=model,
+    )
+
+    # ── Keyboard navigation (hidden buttons)
+    _render_keyboard_nav(filtered_keys, selected_key)
+
+    # ── Action bar
+    st.markdown("---")
+    action_cols = st.columns([2, 1.5, 2, 1])
+    was_edited = edited_comment.strip() != comment.strip()
+
+    with action_cols[0]:
+        if st.button("✅ Approve & Next →", key=f"approve_{selected_key}", use_container_width=True, type="primary"):
+            _handle_approve(session, selected_key, edited_comment.strip(), comment, was_edited, row)
+            next_key = _next_pending_key(filtered_keys, selected_key, session.decisions)
+            if next_key:
+                st.session_state["selected_account_key"] = next_key
+            st.rerun()
+
+    with action_cols[1]:
+        if st.button("⏭️ Skip", key=f"skip_{selected_key}", use_container_width=True):
+            _handle_skip(session, selected_key)
+            next_key = _next_pending_key(filtered_keys, selected_key, session.decisions)
+            if next_key:
+                st.session_state["selected_account_key"] = next_key
+            st.rerun()
+
+    with action_cols[2]:
+        approved_count = session.approved_count()
+        save_label = f"💾 Save {approved_count} to Sheets" if approved_count > 0 else "💾 Save to Sheets"
+        if st.button(save_label, key=f"save_{selected_key}", use_container_width=True):
+            _save_to_master(session, scored_df)
+
+    with action_cols[3]:
+        st.markdown(
+            "<span style='color:#475569;font-size:0.75rem'>← → to navigate</span>",
+            unsafe_allow_html=True,
+        )
+
+
+def _render_keyboard_nav(
+    filtered_keys: list[str],
+    current_key: str,
+) -> None:
+    """Inject keyboard navigation (← →) via hidden Streamlit buttons + JS."""
+    try:
+        idx = filtered_keys.index(current_key)
+    except ValueError:
+        return
+
+    prev_key = filtered_keys[idx - 1] if idx > 0 else None
+    next_key = filtered_keys[idx + 1] if idx < len(filtered_keys) - 1 else None
+
+    if prev_key:
+        if st.button("←", key="__nav_prev__", help="Previous account"):
+            st.session_state["selected_account_key"] = prev_key
+            st.rerun()
+
+    if next_key:
+        if st.button("→", key="__nav_next__", help="Next account"):
+            st.session_state["selected_account_key"] = next_key
+            st.rerun()
+
+    import streamlit.components.v1
+    streamlit.components.v1.html(
+        """
+        <script>
+        (function() {
+          function clickButton(label) {
+            const buttons = window.parent.document.querySelectorAll('button');
+            for (const btn of buttons) {
+              if (btn.innerText.trim() === label) { btn.click(); break; }
+            }
+          }
+          document.addEventListener('keydown', function(e) {
+            if (e.target.tagName === 'TEXTAREA' || e.target.tagName === 'INPUT') return;
+            if (e.key === 'ArrowLeft')  clickButton('←');
+            if (e.key === 'ArrowRight') clickButton('→');
+          }, { once: false });
+        })();
+        </script>
+        """,
+        height=0,
+    )
 
 
 def _get_or_generate_comment(row: pd.Series, scoring: dict, account_key: str, model: str) -> str:
