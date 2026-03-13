@@ -410,3 +410,91 @@ def _col_index_to_letter(col_index: int) -> str:
         col_index, remainder = divmod(col_index - 1, 26)
         result = chr(65 + remainder) + result
     return result
+
+
+def write_portfolio_comment(
+    sheets_service,
+    spreadsheet_id: str,
+    sheet_name: str,
+    comment_text: str,
+    target_cell: str = "",
+) -> tuple:
+    """
+    Write a single portfolio-level CRO comment to the Overview tab.
+
+    Unlike write_comments_to_summary() which matches per-account rows,
+    this writes one comment to a designated cell. If target_cell is empty,
+    it finds or creates a 'CRO Portfolio Comment' row after the last data row.
+
+    Args:
+        sheets_service: Authenticated Sheets API service.
+        spreadsheet_id: Target spreadsheet ID.
+        sheet_name: Overview tab name.
+        comment_text: The portfolio CRO comment.
+        target_cell: Optional explicit A1 cell reference (e.g., "A50").
+                     If empty, auto-detects placement.
+
+    Returns:
+        Tuple of (success: bool, debug_info: dict).
+    """
+    debug_info = {
+        "sheet_name": sheet_name,
+        "target_cell": None,
+        "error": None,
+    }
+
+    if not comment_text:
+        debug_info["error"] = "Empty comment text"
+        return False, debug_info
+
+    try:
+        if target_cell:
+            # Write to explicit cell
+            cell_ref = f"'{sheet_name}'!{target_cell}"
+        else:
+            # Read the sheet to find last data row
+            range_notation = f"'{sheet_name}'"
+            result = (
+                sheets_service.spreadsheets()
+                .values()
+                .get(spreadsheetId=spreadsheet_id, range=range_notation)
+                .execute()
+            )
+            rows = result.get("values", [])
+            last_row = len(rows) + 1  # 1-indexed, next empty row
+
+            # Check if "CRO Portfolio Comment" label already exists
+            label_row = None
+            for i, row in enumerate(rows):
+                if row and "cro portfolio comment" in str(row[0]).lower():
+                    label_row = i + 1  # 1-indexed
+                    break
+
+            if label_row:
+                # Write comment next to existing label (column B)
+                cell_ref = f"'{sheet_name}'!B{label_row}"
+            else:
+                # Create label + comment in the next empty row (skip one row for spacing)
+                label_ref = f"'{sheet_name}'!A{last_row + 1}"
+                sheets_service.spreadsheets().values().update(
+                    spreadsheetId=spreadsheet_id,
+                    range=label_ref,
+                    valueInputOption="RAW",
+                    body={"values": [["CRO Portfolio Comment"]]},
+                ).execute()
+                cell_ref = f"'{sheet_name}'!B{last_row + 1}"
+
+        sheets_service.spreadsheets().values().update(
+            spreadsheetId=spreadsheet_id,
+            range=cell_ref,
+            valueInputOption="RAW",
+            body={"values": [[comment_text]]},
+        ).execute()
+
+        debug_info["target_cell"] = cell_ref
+        return True, debug_info
+
+    except Exception as exc:
+        logger.error("Failed to write portfolio comment: %s", exc)
+        debug_info["error"] = str(exc)
+        return False, debug_info
