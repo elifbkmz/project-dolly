@@ -162,6 +162,12 @@ def _render_portfolio_step(scored_df: pd.DataFrame, session: SessionState) -> No
     if existing_decision and existing_decision.status == "approved":
         st.success(f"Portfolio comment for {selected_region} approved.")
         st.text_area("Approved Comment", value=existing_decision.final_comment, disabled=True, height=120)
+
+        # Save to Overview tab button
+        save_col, _ = st.columns([2, 3])
+        with save_col:
+            if st.button("💾 Save to Overview Tab", key=f"save_portfolio_{selected_region}", type="primary"):
+                _save_portfolio_to_sheet(session, scored_df, selected_region)
     else:
         # Generate or retrieve comment
         comment_cache_key = f"portfolio_comment_{selected_region}"
@@ -438,6 +444,63 @@ def _render_tech_stake_step(scored_df: pd.DataFrame, session: SessionState) -> N
         session.review_step = 2
         st.session_state["session"] = session
         st.rerun()
+
+
+# ── Portfolio save ────────────────────────────────────────────────────────────
+
+
+def _save_portfolio_to_sheet(session: SessionState, scored_df: pd.DataFrame, region: str):
+    """Write the approved portfolio comment to the Overview tab."""
+    from src.google.auth import get_google_credentials
+    from src.google.sheets_client import build_sheets_service, detect_sheet_names, write_portfolio_comment
+    from src.utils.config_loader import load_regions_config
+
+    region_key = f"PORTFOLIO::{region}"
+    decision = session.portfolio_decisions.get(region_key)
+    if not decision or not decision.final_comment:
+        st.warning("No approved portfolio comment to save.")
+        return
+
+    try:
+        creds = get_google_credentials()
+        sheets_svc = build_sheets_service(creds)
+        regions_config = load_regions_config()
+        write_tabs = regions_config.get("comment_write_tabs", {})
+        portfolio_tab = write_tabs.get("portfolio", "Overview")
+
+        # Find the spreadsheet ID for this region
+        region_rows = scored_df[scored_df["region"] == region] if "region" in scored_df.columns else scored_df
+        if region_rows.empty:
+            st.error(f"No data found for region {region}.")
+            return
+
+        sid = str(region_rows.iloc[0].get("spreadsheet_id", ""))
+        if not sid:
+            st.error("No spreadsheet ID found for this region.")
+            return
+
+        # Find the Overview tab
+        tab_names = detect_sheet_names(sheets_svc, sid)
+        target = next((t for t in tab_names if "overview" in t.lower()), portfolio_tab)
+
+        if target not in tab_names:
+            st.error(f"Tab '{target}' not found in spreadsheet. Available: {tab_names}")
+            return
+
+        success, debug = write_portfolio_comment(
+            sheets_svc, sid, target, decision.final_comment
+        )
+
+        if success:
+            st.success(f"💾 Portfolio comment written to '{target}' tab!")
+        else:
+            st.error(f"Failed to write: {debug.get('error', 'Unknown error')}")
+
+        with st.expander("Write-back details", expanded=not success):
+            st.json(debug)
+
+    except Exception as exc:
+        st.error(f"Save failed: {exc}")
 
 
 # ── Multi-tab save ────────────────────────────────────────────────────────────
