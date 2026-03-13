@@ -23,7 +23,7 @@ from google.oauth2 import service_account
 logger = logging.getLogger(__name__)
 
 REQUIRED_SCOPES = [
-    "https://www.googleapis.com/auth/drive.readonly",
+    "https://www.googleapis.com/auth/drive",
     "https://www.googleapis.com/auth/spreadsheets",
 ]
 

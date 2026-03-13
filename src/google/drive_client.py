@@ -147,6 +147,77 @@ def _filename_to_region(filename: str) -> str:
     return name.strip() or filename
 
 
+def add_threaded_comment(
+    drive_service,
+    file_id: str,
+    comment_text: str,
+    sheet_name: str = "Overview",
+    cell_ref: str = "A1",
+    quoted_text: str = "",
+) -> dict:
+    """
+    Add a threaded comment to a specific cell in a Google Sheets file.
+
+    Uses the Drive API v3 comments endpoint with a workbook-range anchor
+    to place the comment on the target cell — exactly how a human would
+    add a comment in Google Sheets.
+
+    Args:
+        drive_service: Authenticated Drive API service (needs drive scope).
+        file_id: Google Sheets file ID (same as spreadsheet_id).
+        comment_text: The comment body text.
+        sheet_name: Tab name to anchor the comment on.
+        cell_ref: Cell reference (e.g., "A1", "U5"). The comment attaches here.
+        quoted_text: Optional text of the cell being commented on.
+                     Shows as "quoted" context in the comment thread.
+
+    Returns:
+        The created comment resource dict from the API.
+
+    Raises:
+        HttpError: If the API call fails.
+    """
+    import json as _json
+
+    # Build the anchor JSON for a workbook cell
+    anchor = _json.dumps({
+        "type": "workbook-range",
+        "uid": 0,
+        "range": f"'{sheet_name}'!{cell_ref}",
+    })
+
+    body = {
+        "content": comment_text,
+        "anchor": anchor,
+    }
+
+    # Add quoted content if provided (shows the cell text being commented on)
+    if quoted_text:
+        body["quotedFileContent"] = {
+            "mimeType": "text/plain",
+            "value": quoted_text,
+        }
+
+    try:
+        result = (
+            drive_service.comments()
+            .create(
+                fileId=file_id,
+                body=body,
+                fields="id,content,anchor,author,createdTime",
+            )
+            .execute()
+        )
+        logger.info(
+            "Created threaded comment on %s!%s (comment id: %s)",
+            sheet_name, cell_ref, result.get("id"),
+        )
+        return result
+    except HttpError as exc:
+        logger.error("Failed to create threaded comment: %s", exc)
+        raise
+
+
 def get_file_metadata(drive_service, file_id: str) -> dict:
     """
     Returns metadata for a specific file (name, modifiedTime, etc.).

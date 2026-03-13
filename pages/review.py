@@ -450,10 +450,10 @@ def _render_tech_stake_step(scored_df: pd.DataFrame, session: SessionState) -> N
 
 
 def _save_portfolio_to_sheet(session: SessionState, scored_df: pd.DataFrame, region: str):
-    """Write the approved portfolio comment to the Overview tab."""
+    """Write the approved portfolio comment as a threaded comment on the Overview tab."""
     from src.google.auth import get_google_credentials
-    from src.google.sheets_client import build_sheets_service, detect_sheet_names, write_portfolio_comment
-    from src.utils.config_loader import load_regions_config
+    from src.google.drive_client import build_drive_service, add_threaded_comment
+    from src.google.sheets_client import build_sheets_service, detect_sheet_names
 
     region_key = f"PORTFOLIO::{region}"
     decision = session.portfolio_decisions.get(region_key)
@@ -463,10 +463,8 @@ def _save_portfolio_to_sheet(session: SessionState, scored_df: pd.DataFrame, reg
 
     try:
         creds = get_google_credentials()
+        drive_svc = build_drive_service(creds)
         sheets_svc = build_sheets_service(creds)
-        regions_config = load_regions_config()
-        write_tabs = regions_config.get("comment_write_tabs", {})
-        portfolio_tab = write_tabs.get("portfolio", "Overview")
 
         # Find the spreadsheet ID for this region
         region_rows = scored_df[scored_df["region"] == region] if "region" in scored_df.columns else scored_df
@@ -479,25 +477,29 @@ def _save_portfolio_to_sheet(session: SessionState, scored_df: pd.DataFrame, reg
             st.error("No spreadsheet ID found for this region.")
             return
 
-        # Find the Overview tab
+        # Find the Overview tab name
         tab_names = detect_sheet_names(sheets_svc, sid)
-        target = next((t for t in tab_names if "overview" in t.lower()), portfolio_tab)
+        target = next((t for t in tab_names if "overview" in t.lower()), "Overview")
 
         if target not in tab_names:
             st.error(f"Tab '{target}' not found in spreadsheet. Available: {tab_names}")
             return
 
-        success, debug = write_portfolio_comment(
-            sheets_svc, sid, target, decision.final_comment
+        # Add threaded comment on the "CUSTOMER PORTFOLIO OVERVIEW" title cell (A1)
+        result = add_threaded_comment(
+            drive_service=drive_svc,
+            file_id=sid,
+            comment_text=decision.final_comment,
+            sheet_name=target,
+            cell_ref="A1",
+            quoted_text="CUSTOMER PORTFOLIO OVERVIEW",
         )
 
-        if success:
-            st.success(f"💾 Portfolio comment written to '{target}' tab!")
-        else:
-            st.error(f"Failed to write: {debug.get('error', 'Unknown error')}")
+        comment_id = result.get("id", "unknown")
+        st.success(f"💾 Portfolio comment added as threaded comment on '{target}' tab (comment #{comment_id})!")
 
-        with st.expander("Write-back details", expanded=not success):
-            st.json(debug)
+        with st.expander("Comment details"):
+            st.json(result)
 
     except Exception as exc:
         st.error(f"Save failed: {exc}")
