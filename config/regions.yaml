@@ -49,7 +49,11 @@ explicit_sheet_names:
   tech_stake: "Current Tech Stake Information"
   summary: "Account Summary"
 
-# Tab where CRO-approved comments are written back.
-# Must contain a "Customer Name" column matching account names.
-# Change this to "Maps" or "Current Tech Stake Information" as needed.
+# Tab where CRO-approved comments are written back, per review step.
+comment_write_tabs:
+  portfolio: "Overview"
+  accounts: "Maps"
+  tech_stake: "Current Tech Stake Information"
+
+# Legacy key for backward compatibility
 comment_write_tab: "Maps"

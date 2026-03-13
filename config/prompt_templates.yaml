@@ -66,3 +66,65 @@ sentence_count: "2-3"
 generation_temperature: 0.7
 regeneration_temperature: 0.85
 max_tokens: 512
+
+portfolio_prompt_template: |
+  Review this regional portfolio and write your {sentence_count}-sentence CRO comment
+  for the Overview tab.
+
+  REGION: {region}
+
+  PORTFOLIO SUMMARY:
+  - Total Accounts: {total_accounts}
+  - Total ARR: {total_arr}
+  - Average NRR: {avg_nrr}
+  - P1 (Critical): {p1_count} accounts
+  - P2 (At-Risk): {p2_count} accounts
+  - P3 (Healthy): {p3_count} accounts
+
+  NRR RISK DISTRIBUTION:
+  - CRITICAL (NRR < 90%): {nrr_critical_count} accounts
+  - AT_RISK (90-100%): {nrr_at_risk_count} accounts
+  - HEALTHY (100-110%): {nrr_healthy_count} accounts
+  - STRONG (>110%): {nrr_strong_count} accounts
+
+  TOP 5 PRIORITY ACCOUNTS (by composite score):
+  {top_5_accounts}
+
+  UPCOMING RENEWALS (next 90 days):
+  {upcoming_renewals}
+
+  EXPANSION OPPORTUNITY:
+  - Accounts with competitor-held channels: {competitor_opportunity_count}
+  - Accounts with whitespace channels: {whitespace_opportunity_count}
+  - Total displacement opportunities: {displacement_count}
+
+  Write your CRO portfolio comment now. Address the biggest risk or opportunity
+  at the regional level. Be specific about which accounts or patterns need attention.
+  Do not use bullet points or headers. Output only the comment text, nothing else.
+
+tech_stake_prompt_template: |
+  Review this account's tech stack and write your {sentence_count}-sentence CRO comment
+  for the Current Tech Stack Information tab.
+
+  ACCOUNT: {account_name}
+  REGION: {region}
+  AE: {ae_name}
+  ARR: {arr_display}
+  NRR: {nrr_display}
+
+  TECH STACK STATUS:
+  - Insider Products Active: {insider_product_count} of {total_channels} channels
+  - Active Insider Products: {insider_channels_display}
+
+  VENDOR GAPS (displacement opportunities):
+  {vendor_gaps}
+
+  WHITESPACE (uncaptured channels):
+  {whitespace_gaps}
+
+  CO-EXISTING COMPETITORS: {coexisting_competitors}
+
+  Write your CRO tech stack comment now. Focus on the most valuable displacement
+  opportunity or the most critical vendor gap. Name specific products and competitors.
+  Suggest a concrete action: offer a POC, propose a buyout, position a bundle.
+  Do not use bullet points or headers. Output only the comment text, nothing else.
