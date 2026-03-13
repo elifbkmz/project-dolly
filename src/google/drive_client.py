@@ -151,7 +151,7 @@ def add_threaded_comment(
     drive_service,
     file_id: str,
     comment_text: str,
-    sheet_name: str = "Overview",
+    sheet_gid: int = 0,
     cell_ref: str = "A1",
     quoted_text: str = "",
 ) -> dict:
@@ -166,10 +166,11 @@ def add_threaded_comment(
         drive_service: Authenticated Drive API service (needs drive scope).
         file_id: Google Sheets file ID (same as spreadsheet_id).
         comment_text: The comment body text.
-        sheet_name: Tab name to anchor the comment on.
-        cell_ref: Cell reference (e.g., "A1", "U5"). The comment attaches here.
-        quoted_text: Optional text of the cell being commented on.
-                     Shows as "quoted" context in the comment thread.
+        sheet_gid: The sheet's gid (sheetId from spreadsheet properties).
+                   Each tab has a unique gid — 0 is only for the first tab.
+        cell_ref: Cell reference without sheet name (e.g., "A1", "U5").
+        quoted_text: The actual text content of the cell being commented on.
+                     Must match exactly or the comment shows as "original content deleted".
 
     Returns:
         The created comment resource dict from the API.
@@ -179,11 +180,11 @@ def add_threaded_comment(
     """
     import json as _json
 
-    # Build the anchor JSON for a workbook cell
+    # Anchor format: uid = sheet gid, range = just the cell ref (no sheet name)
     anchor = _json.dumps({
         "type": "workbook-range",
-        "uid": 0,
-        "range": f"'{sheet_name}'!{cell_ref}",
+        "uid": sheet_gid,
+        "range": cell_ref,
     })
 
     body = {
@@ -191,7 +192,7 @@ def add_threaded_comment(
         "anchor": anchor,
     }
 
-    # Add quoted content if provided (shows the cell text being commented on)
+    # quotedFileContent must match the actual cell text exactly
     if quoted_text:
         body["quotedFileContent"] = {
             "mimeType": "text/plain",
@@ -209,8 +210,8 @@ def add_threaded_comment(
             .execute()
         )
         logger.info(
-            "Created threaded comment on %s!%s (comment id: %s)",
-            sheet_name, cell_ref, result.get("id"),
+            "Created threaded comment on gid=%d cell %s (comment id: %s)",
+            sheet_gid, cell_ref, result.get("id"),
         )
         return result
     except HttpError as exc:

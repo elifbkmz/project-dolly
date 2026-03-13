@@ -477,7 +477,7 @@ def _save_portfolio_to_sheet(session: SessionState, scored_df: pd.DataFrame, reg
             st.error("No spreadsheet ID found for this region.")
             return
 
-        # Find the Overview tab name
+        # Find the Overview tab name and its gid
         tab_names = detect_sheet_names(sheets_svc, sid)
         target = next((t for t in tab_names if "overview" in t.lower()), "Overview")
 
@@ -485,18 +485,39 @@ def _save_portfolio_to_sheet(session: SessionState, scored_df: pd.DataFrame, reg
             st.error(f"Tab '{target}' not found in spreadsheet. Available: {tab_names}")
             return
 
-        # Add threaded comment on the "CUSTOMER PORTFOLIO OVERVIEW" title cell (A1)
+        # Get sheet gid from spreadsheet properties
+        sheet_metadata = sheets_svc.spreadsheets().get(
+            spreadsheetId=sid, fields="sheets.properties"
+        ).execute()
+        sheet_gid = 0
+        for sheet in sheet_metadata.get("sheets", []):
+            props = sheet.get("properties", {})
+            if props.get("title") == target:
+                sheet_gid = props.get("sheetId", 0)
+                break
+
+        # Read the actual cell A1 content for accurate quotedFileContent
+        cell_result = sheets_svc.spreadsheets().values().get(
+            spreadsheetId=sid, range=f"'{target}'!A1"
+        ).execute()
+        cell_values = cell_result.get("values", [[]])
+        actual_cell_text = str(cell_values[0][0]).strip() if cell_values and cell_values[0] else ""
+
+        # Add threaded comment anchored on the title cell
         result = add_threaded_comment(
             drive_service=drive_svc,
             file_id=sid,
             comment_text=decision.final_comment,
-            sheet_name=target,
+            sheet_gid=sheet_gid,
             cell_ref="A1",
-            quoted_text="CUSTOMER PORTFOLIO OVERVIEW",
+            quoted_text=actual_cell_text,
         )
 
         comment_id = result.get("id", "unknown")
-        st.success(f"💾 Portfolio comment added as threaded comment on '{target}' tab (comment #{comment_id})!")
+        st.success(
+            f"💾 Portfolio comment added as threaded comment on '{target}' tab, "
+            f"cell A1 (\"{actual_cell_text}\") — comment #{comment_id}"
+        )
 
         with st.expander("Comment details"):
             st.json(result)
