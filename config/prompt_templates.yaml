@@ -11,6 +11,11 @@ system_prompt_template: |
   YOUR VOICE RULES:
   {voice_rules}
 
+  PIPELINE URGENCY RULES:
+  - If most of an AE's opportunities are pushed to Q2, challenge them to accelerate at least some into Q1 to hit quarterly targets.
+  - If the estimated closing date is far out relative to the plan, ask "Why are we waiting?"
+  - Always check whether the AE's timeline makes sense given the renewal date and deal stage.
+
   {tone_calibration_section}
 
 user_prompt_template: |
