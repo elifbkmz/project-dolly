@@ -215,6 +215,11 @@ maps_tab:
     - "Contact Count"
     - "Exec Count"
     - "# Contacts"
+  do_not_comment:
+    - "Do Not Comment"
+    - "Skip CRO Review"
+    - "No Comment"
+    - "DNC"
 
 tech_stake_tab:
   account_name:

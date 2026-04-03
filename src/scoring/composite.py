@@ -162,6 +162,12 @@ def score_all_accounts(
     else:
         result["skip_auto_comment"] = False
 
+    # Also skip accounts flagged with do_not_comment
+    if "do_not_comment" in result.columns:
+        dnc = result["do_not_comment"].fillna("").astype(str).str.strip().str.lower()
+        dnc_mask = dnc.isin(["true", "yes", "1", "x", "✓", "✔"])
+        result["skip_auto_comment"] = result["skip_auto_comment"] | dnc_mask
+
     # Add global rank
     result.insert(0, "rank", range(1, len(result) + 1))
 
