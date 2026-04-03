@@ -858,7 +858,7 @@ def _save_to_master(session: SessionState, scored_df: pd.DataFrame):
             for account_name, comment_text in account_map.items():
                 cell_info = find_account_cell(
                     sheets_svc, spreadsheet_id, target_tab, account_name,
-                    target_col="next_steps", fallback_col="account_name",
+                    target_col="account_name", fallback_col="account_name",
                 )
                 if not cell_info["found"]:
                     all_debug.append({

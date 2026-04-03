@@ -155,7 +155,7 @@ def add_threaded_comment(
 ) -> dict:
     """
     Add a comment to a Google Sheets file, anchored to a specific sheet tab.
-    Deletes any existing comment on the same tab first (one comment per tab).
+    Existing comments are preserved for threading (Serhat/AEs reply to previous comments).
 
     Args:
         drive_service: Authenticated Drive API service (needs drive scope).
