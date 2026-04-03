@@ -152,35 +152,113 @@ def add_threaded_comment(
     file_id: str,
     comment_text: str,
     sheet_gid: int = 0,
-    cell_ref: str = "A1",
-    quoted_text: str = "",
 ) -> dict:
     """
-    Add a threaded comment to a specific cell in a Google Sheets file.
-
-    Uses the Drive API v3 comments endpoint with a workbook-range anchor
-    to place the comment on the target cell — exactly how a human would
-    add a comment in Google Sheets.
+    Add a comment to a Google Sheets file, anchored to a specific sheet tab.
+    Deletes any existing comment on the same tab first (one comment per tab).
 
     Args:
         drive_service: Authenticated Drive API service (needs drive scope).
         file_id: Google Sheets file ID (same as spreadsheet_id).
         comment_text: The comment body text.
         sheet_gid: The sheet's gid (sheetId from spreadsheet properties).
-                   Each tab has a unique gid — 0 is only for the first tab.
-        cell_ref: Cell reference without sheet name (e.g., "A1", "U5").
-        quoted_text: The actual text content of the cell being commented on.
-                     Must match exactly or the comment shows as "original content deleted".
 
     Returns:
         The created comment resource dict from the API.
-
-    Raises:
-        HttpError: If the API call fails.
     """
     import json as _json
 
-    # Anchor format: uid = sheet gid, range = just the cell ref (no sheet name)
+    # Preserve existing comments for threading — Serhat/AEs reply to previous comments
+
+    anchor = _json.dumps({
+        "type": "workbook-range",
+        "uid": sheet_gid,
+        "range": "A1",
+    })
+
+    body = {
+        "content": comment_text,
+        "anchor": anchor,
+    }
+
+    try:
+        result = (
+            drive_service.comments()
+            .create(
+                fileId=file_id,
+                body=body,
+                fields="id,content,anchor,author,createdTime",
+            )
+            .execute()
+        )
+        logger.info(
+            "Created comment on sheet gid=%d (comment id: %s)",
+            sheet_gid, result.get("id"),
+        )
+        return result
+    except HttpError as exc:
+        logger.error("Failed to create threaded comment: %s", exc)
+        raise
+
+
+def _delete_comments_on_tab(drive_service, file_id: str, sheet_gid: int):
+    """Delete all comments anchored to a specific sheet tab."""
+    import json as _json
+
+    try:
+        resp = drive_service.comments().list(
+            fileId=file_id,
+            fields="comments(id,anchor)",
+            pageSize=100,
+        ).execute()
+
+        for comment in resp.get("comments", []):
+            anchor_str = comment.get("anchor", "")
+            if not anchor_str:
+                continue
+            try:
+                anchor = _json.loads(anchor_str)
+            except (ValueError, TypeError):
+                continue
+            if anchor.get("uid") == sheet_gid:
+                drive_service.comments().delete(
+                    fileId=file_id, commentId=comment["id"]
+                ).execute()
+                logger.info("Deleted existing comment %s on gid=%d", comment["id"], sheet_gid)
+    except HttpError:
+        pass  # Non-critical — proceed to create the new comment
+
+
+def add_cell_comment(
+    drive_service,
+    file_id: str,
+    comment_text: str,
+    sheet_gid: int,
+    cell_ref: str,
+    quoted_text: str = "",
+) -> dict:
+    """
+    Add a comment anchored to a specific cell in a Google Sheets file.
+
+    Uses the Drive API v3 comments endpoint with a workbook-range anchor
+    and quotedFileContent — exactly how a human adds a comment in Sheets.
+
+    Args:
+        drive_service: Authenticated Drive API service (needs drive scope).
+        file_id: Google Sheets file ID.
+        comment_text: The comment body text.
+        sheet_gid: The sheet's gid (sheetId from spreadsheet properties).
+        cell_ref: Cell reference like "U5" or "A3" (no sheet name prefix).
+        quoted_text: The actual text content of the cell. Must match exactly
+                     or the comment shows as "original content deleted".
+
+    Returns:
+        The created comment resource dict from the API.
+    """
+    import json as _json
+
+    # Preserve existing comments for threading — Serhat/AEs reply to previous comments
+
     anchor = _json.dumps({
         "type": "workbook-range",
         "uid": sheet_gid,
@@ -192,7 +270,6 @@ def add_threaded_comment(
         "anchor": anchor,
     }
 
-    # quotedFileContent must match the actual cell text exactly
     if quoted_text:
         body["quotedFileContent"] = {
             "mimeType": "text/plain",
@@ -210,13 +287,45 @@ def add_threaded_comment(
             .execute()
         )
         logger.info(
-            "Created threaded comment on gid=%d cell %s (comment id: %s)",
+            "Created cell comment on gid=%d cell %s (comment id: %s)",
             sheet_gid, cell_ref, result.get("id"),
         )
         return result
     except HttpError as exc:
-        logger.error("Failed to create threaded comment: %s", exc)
+        logger.error("Failed to create cell comment on %s: %s", cell_ref, exc)
         raise
+
+
+def _delete_comment_on_cell(drive_service, file_id: str, sheet_gid: int, cell_ref: str):
+    """Delete existing comments anchored to a specific cell (by our service account)."""
+    import json as _json
+
+    try:
+        resp = drive_service.comments().list(
+            fileId=file_id,
+            fields="comments(id,anchor,author(me))",
+            pageSize=100,
+        ).execute()
+
+        for comment in resp.get("comments", []):
+            # Only delete our own comments
+            if not comment.get("author", {}).get("me", False):
+                continue
+            anchor_str = comment.get("anchor", "")
+            if not anchor_str:
+                continue
+            try:
+                anchor = _json.loads(anchor_str)
+            except (ValueError, TypeError):
+                continue
+            if anchor.get("uid") == sheet_gid and anchor.get("range") == cell_ref:
+                drive_service.comments().delete(
+                    fileId=file_id, commentId=comment["id"]
+                ).execute()
+                logger.info("Deleted existing comment %s on gid=%d cell %s",
+                            comment["id"], sheet_gid, cell_ref)
+    except HttpError:
+        pass  # Non-critical — proceed to create the new comment
 
 
 def get_file_metadata(drive_service, file_id: str) -> dict:
