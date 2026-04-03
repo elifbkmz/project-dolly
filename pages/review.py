@@ -978,6 +978,7 @@ def _get_filtered_account_list(
     session: "SessionState",
     list_search: str,
     list_tier_filter: str,
+    show_low_mrr: bool = False,
 ) -> list[str]:
     """
     Return account keys visible in the left panel, in review_order ordering.
@@ -1000,6 +1001,8 @@ def _get_filtered_account_list(
         if search and search not in account_name:
             continue
         if list_tier_filter != "All" and tier != list_tier_filter:
+            continue
+        if not show_low_mrr and row.get("skip_auto_comment", False):
             continue
         keys.append(key)
     return keys
@@ -1109,9 +1112,14 @@ def _render_left_panel(
         key="list_tier_filter",
         label_visibility="collapsed",
     )
+    show_low_mrr = st.checkbox(
+        "Show low-MRR accounts",
+        value=st.session_state.get("show_low_mrr", False),
+        key="show_low_mrr",
+    )
 
     # ── Build filtered list and resolve selection
-    filtered_keys = _get_filtered_account_list(scored_df, session, search, tier_filter)
+    filtered_keys = _get_filtered_account_list(scored_df, session, search, tier_filter, show_low_mrr)
     selected_key = _resolve_selected_key(
         filtered_keys, st.session_state.get("selected_account_key")
     )
