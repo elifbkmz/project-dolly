@@ -146,6 +146,22 @@ def score_all_accounts(
         ["_tier_sort", "composite_score"], ascending=[True, False]
     ).drop(columns=["_tier_sort"]).reset_index(drop=True)
 
+    # Tag accounts below MRR threshold for auto-skip
+    min_mrr = 0
+    if scoring_weights_config:
+        min_mrr = scoring_weights_config.get("composite_tiers", {}).get("min_mrr_threshold", 0)
+    if min_mrr > 0:
+        def _parse_mrr(val):
+            if val is None or (isinstance(val, float) and pd.isna(val)):
+                return 0.0
+            try:
+                return float(str(val).replace("$", "").replace(",", "").strip())
+            except (ValueError, TypeError):
+                return 0.0
+        result["skip_auto_comment"] = result["arr"].apply(_parse_mrr) < min_mrr
+    else:
+        result["skip_auto_comment"] = False
+
     # Add global rank
     result.insert(0, "rank", range(1, len(result) + 1))
 

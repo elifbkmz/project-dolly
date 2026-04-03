@@ -38,6 +38,7 @@ composite_tiers:
   p2_threshold: 40        # Composite >= this AND < p1 = P2
   # Below p2 = P3
   renewal_days_p1: 90     # Renewal within this many days forces P1 regardless of score
+  min_mrr_threshold: 2000  # Accounts below this MRR are auto-skipped in review queue
 
 hard_overrides:
   # These conditions force P1 regardless of composite score
