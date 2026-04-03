@@ -159,225 +159,141 @@ def read_sheet_as_dataframe(
     return df
 
 
-def write_comments_to_summary(
+def find_account_cell(
     sheets_service,
     spreadsheet_id: str,
     sheet_name: str,
-    account_comment_map: Dict[str, str],
-    account_col: str = "account_name",
-    comment_col: str = "CRO Comment",
-) -> tuple:
+    account_name: str,
+    target_col: str = "account_name",
+    fallback_col: str = "account_name",
+) -> dict:
     """
-    Writes approved CRO comments back into the Summary tab.
-
-    Reads raw sheet values directly (no column normalization) so that row
-    numbers are exact. Tries multiple common account-column name variants.
-    Finds or creates the 'CRO Comment' column. Uses batchUpdate for efficiency.
+    Locate an account's row in a sheet and return cell reference + cell text
+    for the target column. Falls back to account name column if target is empty.
 
     Args:
         sheets_service: Authenticated Sheets API service.
-        spreadsheet_id: Target spreadsheet ID.
-        sheet_name: Summary tab name.
-        account_comment_map: {canonical_account_name: approved_comment_text}
-        account_col: Preferred canonical name for the account column.
-        comment_col: Column name to write comments into (created if absent).
+        spreadsheet_id: Google Sheets file ID.
+        sheet_name: Tab name to search in.
+        account_name: Account name to match (case-insensitive).
+        target_col: Preferred column to anchor on (canonical name).
+        fallback_col: Fallback column if target cell is empty.
 
     Returns:
-        Tuple of (count_written: int, debug_info: dict) where debug_info contains
-        diagnostic details about the write operation.
+        Dict with keys: found (bool), cell_ref (str like "U5"),
+        cell_text (str), sheet_row (int), debug (str).
     """
-    debug_info: Dict = {
-        "sheet_name": sheet_name,
-        "header_idx": None,
-        "headers_found": [],
-        "acct_col_name": None,
-        "acct_col_idx": None,
-        "comment_col_idx": None,
-        "comment_col_letter": None,
-        "cells_written": [],
-        "sheet_sample_accounts": [],
-        "accounts_looked_for": list(account_comment_map.keys()),
-        "error": None,
-    }
+    result = {"found": False, "cell_ref": "", "cell_text": "", "sheet_row": 0, "debug": ""}
 
-    if not account_comment_map:
-        logger.info("No approved comments to write back.")
-        return 0, debug_info
-
-    # ── Read raw sheet values (bypass DataFrame so row numbers stay exact) ────
-    range_notation = f"'{sheet_name}'"
+    # Read raw sheet values
     try:
-        result = (
+        resp = (
             sheets_service.spreadsheets()
             .values()
-            .get(spreadsheetId=spreadsheet_id, range=range_notation)
+            .get(spreadsheetId=spreadsheet_id, range=f"'{sheet_name}'")
             .execute()
         )
     except HttpError as exc:
-        logger.error("Failed to read sheet '%s' for write-back: %s", sheet_name, exc)
-        raise
+        result["debug"] = f"Failed to read sheet: {exc}"
+        return result
 
-    rows = result.get("values", [])
+    rows = resp.get("values", [])
     if not rows:
-        logger.warning("Summary sheet '%s' is empty — cannot write back.", sheet_name)
-        debug_info["error"] = "Sheet is empty"
-        return 0, debug_info
+        result["debug"] = "Sheet is empty"
+        return result
 
-    # ── Detect header row (mirrors read_sheet_as_dataframe logic) ─────────────
+    # Detect header row (skip empty rows, long first cells, stats rows)
     header_idx = 0
-    skipped_reasons: List[str] = []
     while header_idx < len(rows):
         row = rows[header_idx]
         if not any(str(c).strip() for c in row):
-            skipped_reasons.append(f"row {header_idx+1}: empty")
             header_idx += 1
             continue
         first_cell = str(row[0]).strip() if row else ""
         if len(first_cell) > 60:
-            skipped_reasons.append(f"row {header_idx+1}: first cell too long ({len(first_cell)} chars): '{first_cell[:40]}...'")
             header_idx += 1
             continue
         other_cells = [str(c).strip() for c in row[1:] if str(c).strip()]
         if other_cells and sum(1 for c in other_cells if c.endswith("%")) / len(other_cells) > 0.4:
-            skipped_reasons.append(f"row {header_idx+1}: stats row (mostly %)")
             header_idx += 1
             continue
         break
 
-    debug_info["header_idx"] = header_idx
-    debug_info["skipped_rows"] = skipped_reasons
-
     if header_idx >= len(rows):
-        logger.warning("Sheet '%s' has no detectable header row.", sheet_name)
-        debug_info["error"] = "No detectable header row"
-        return 0, debug_info
+        result["debug"] = "No detectable header row"
+        return result
 
-    headers = [str(h).strip() for h in rows[header_idx]]
-    data_rows = rows[header_idx + 1:]
-    debug_info["headers_found"] = headers[:15]  # first 15 headers for debug
+    headers = [str(h).strip().lower() for h in rows[header_idx]]
 
-    # ── Find account column — try canonical name + common raw sheet variants ──
-    _ACCOUNT_CANDIDATES = [
-        account_col,       # "account_name"
-        "customer name",   # most common raw sheet header
-        "account name",
-        "customer_name",
-        "company",
-        "company name",
-        "name",
-    ]
-    acct_col_idx: Optional[int] = None
+    # Find account column
+    _ACCOUNT_CANDIDATES = ["account_name", "customer name", "account name",
+                           "customer_name", "company", "company name", "name"]
+    acct_col_idx = None
     for candidate in _ACCOUNT_CANDIDATES:
         for i, h in enumerate(headers):
-            if h.lower() == candidate.lower():
+            if h == candidate.lower():
                 acct_col_idx = i
                 break
         if acct_col_idx is not None:
-            debug_info["acct_col_name"] = candidate
             break
 
     if acct_col_idx is None:
-        logger.error(
-            "Account column not found in sheet '%s'. Headers: %s",
-            sheet_name, headers[:10],
-        )
-        debug_info["error"] = f"Account column not found. Headers seen: {headers[:10]}"
-        return 0, debug_info
+        result["debug"] = f"Account column not found. Headers: {headers[:10]}"
+        return result
 
-    debug_info["acct_col_idx"] = acct_col_idx
-
-    # ── Find or create CRO Comment column ────────────────────────────────────
-    comment_col_idx: Optional[int] = None
-    for i, h in enumerate(headers):
-        if h.lower() == comment_col.lower():
-            comment_col_idx = i
-            break
-
-    if comment_col_idx is None:
-        # Append at the end of the header row
-        comment_col_idx = len(headers)
-        header_sheet_row = header_idx + 1  # 1-indexed
-        _write_cell(
-            sheets_service, spreadsheet_id, sheet_name,
-            row=header_sheet_row, col=comment_col_idx + 1, value=comment_col,
-        )
-        logger.info("Created column '%s' in sheet '%s'", comment_col, sheet_name)
-        debug_info["comment_col_created"] = True
+    # Find target column index
+    target_col_idx = None
+    if target_col == "account_name":
+        target_col_idx = acct_col_idx
     else:
-        debug_info["comment_col_created"] = False
+        _NEXT_STEPS_CANDIDATES = ["next_steps", "next steps", "next steps & execution strategy",
+                                  "next steps and execution strategy"]
+        for candidate in _NEXT_STEPS_CANDIDATES if target_col == "next_steps" else [target_col]:
+            for i, h in enumerate(headers):
+                if candidate.lower() in h:
+                    target_col_idx = i
+                    break
+            if target_col_idx is not None:
+                break
 
-    debug_info["comment_col_idx"] = comment_col_idx
-    col_letter = _col_index_to_letter(comment_col_idx + 1)
-    debug_info["comment_col_letter"] = col_letter
-
-    # ── Match accounts and build batch updates ────────────────────────────────
-    # Sheet row for data_rows[i] = header_idx + 2 + i  (1-indexed, skipped rows accounted for)
-    lookup = {name.strip().lower(): comment for name, comment in account_comment_map.items()}
-    updates: List[dict] = []
-    written = 0
-
-    # Collect sample of what account names are actually in the sheet
-    sheet_sample = []
-    for data_row in data_rows[:10]:
-        if acct_col_idx < len(data_row):
-            v = str(data_row[acct_col_idx]).strip()
-            if v:
-                sheet_sample.append(v)
-    debug_info["sheet_sample_accounts"] = sheet_sample
+    # Match account row
+    account_lower = account_name.strip().lower()
+    data_rows = rows[header_idx + 1:]
 
     for row_offset, data_row in enumerate(data_rows):
         if acct_col_idx >= len(data_row):
             continue
         cell_name = str(data_row[acct_col_idx]).strip().lower()
-        if not cell_name or cell_name in ("nan", "none", ""):
+        if cell_name != account_lower:
             continue
-        comment = lookup.get(cell_name)
-        if comment is None:
-            continue
-        sheet_row = header_idx + 2 + row_offset  # 1-indexed, accounts for skipped rows
-        cell_range = f"'{sheet_name}'!{col_letter}{sheet_row}"
-        updates.append({"range": cell_range, "values": [[comment]]})
 
-        # Capture a few context columns so user can see which row variant this is
-        row_context = {}
-        for ctx_i, ctx_h in enumerate(headers[:12]):
-            if ctx_i == acct_col_idx:
-                continue
-            if ctx_i < len(data_row) and str(data_row[ctx_i]).strip():
-                row_context[ctx_h] = str(data_row[ctx_i]).strip()
+        sheet_row = header_idx + 2 + row_offset  # 1-indexed
 
-        debug_info["cells_written"].append({
-            "account": str(data_row[acct_col_idx]).strip(),  # original casing
-            "cell": f"{col_letter}{sheet_row}",
-            "row_offset": row_offset,
-            "row_context": row_context,
-        })
-        written += 1
-        logger.debug("Queued: '%s' → %s%d", cell_name, col_letter, sheet_row)
+        # Try target column first, fall back to account name column
+        chosen_col_idx = None
+        cell_text = ""
 
-    if not updates:
-        sample = [
-            str(r[acct_col_idx]).strip() for r in data_rows[:5] if acct_col_idx < len(r)
-        ]
-        logger.warning(
-            "No matching accounts found in '%s'. Looked for: %s. Sheet sample: %s",
-            sheet_name, list(account_comment_map.keys()), sample,
-        )
-        debug_info["error"] = f"No matching accounts. Looked for: {list(account_comment_map.keys())}. Sheet sample: {sample}"
-        return 0, debug_info
+        if target_col_idx is not None and target_col_idx < len(data_row):
+            val = str(data_row[target_col_idx]).strip()
+            if val and val.lower() not in ("nan", "none", "n/a", ""):
+                chosen_col_idx = target_col_idx
+                cell_text = val
 
-    # ── Batch write to Sheets ─────────────────────────────────────────────────
-    body = {"valueInputOption": "RAW", "data": updates}
-    try:
-        sheets_service.spreadsheets().values().batchUpdate(
-            spreadsheetId=spreadsheet_id, body=body
-        ).execute()
-        logger.info("Wrote %d comments to '%s' in %s", written, sheet_name, spreadsheet_id)
-    except HttpError as exc:
-        logger.error("Failed to write comments: %s", exc)
-        raise
+        if chosen_col_idx is None:
+            # Fallback to account name cell
+            chosen_col_idx = acct_col_idx
+            cell_text = str(data_row[acct_col_idx]).strip()
 
-    return written, debug_info
+        col_letter = _col_index_to_letter(chosen_col_idx + 1)
+        result["found"] = True
+        result["cell_ref"] = f"{col_letter}{sheet_row}"
+        result["cell_text"] = cell_text
+        result["sheet_row"] = sheet_row
+        result["debug"] = f"Matched row {sheet_row}, col {col_letter} (idx {chosen_col_idx})"
+        return result
+
+    result["debug"] = f"Account '{account_name}' not found in sheet"
+    return result
 
 
 # ── Internal helpers ──────────────────────────────────────────────────────────
@@ -391,18 +307,6 @@ def _find_column(df: pd.DataFrame, canonical_name: str) -> Optional[str]:
     return None
 
 
-def _write_cell(sheets_service, spreadsheet_id: str, sheet_name: str, row: int, col: int, value: str) -> None:
-    """Write a single cell value (1-indexed row and col)."""
-    col_letter = _col_index_to_letter(col)
-    cell_range = f"'{sheet_name}'!{col_letter}{row}"
-    sheets_service.spreadsheets().values().update(
-        spreadsheetId=spreadsheet_id,
-        range=cell_range,
-        valueInputOption="RAW",
-        body={"values": [[value]]},
-    ).execute()
-
-
 def _col_index_to_letter(col_index: int) -> str:
     """Convert 1-indexed column number to letter(s). E.g., 1→A, 27→AA."""
     result = ""
@@ -412,89 +316,3 @@ def _col_index_to_letter(col_index: int) -> str:
     return result
 
 
-def write_portfolio_comment(
-    sheets_service,
-    spreadsheet_id: str,
-    sheet_name: str,
-    comment_text: str,
-    target_cell: str = "",
-) -> tuple:
-    """
-    Write a single portfolio-level CRO comment to the Overview tab.
-
-    Unlike write_comments_to_summary() which matches per-account rows,
-    this writes one comment to a designated cell. If target_cell is empty,
-    it finds or creates a 'CRO Portfolio Comment' row after the last data row.
-
-    Args:
-        sheets_service: Authenticated Sheets API service.
-        spreadsheet_id: Target spreadsheet ID.
-        sheet_name: Overview tab name.
-        comment_text: The portfolio CRO comment.
-        target_cell: Optional explicit A1 cell reference (e.g., "A50").
-                     If empty, auto-detects placement.
-
-    Returns:
-        Tuple of (success: bool, debug_info: dict).
-    """
-    debug_info = {
-        "sheet_name": sheet_name,
-        "target_cell": None,
-        "error": None,
-    }
-
-    if not comment_text:
-        debug_info["error"] = "Empty comment text"
-        return False, debug_info
-
-    try:
-        if target_cell:
-            # Write to explicit cell
-            cell_ref = f"'{sheet_name}'!{target_cell}"
-        else:
-            # Read the sheet to find last data row
-            range_notation = f"'{sheet_name}'"
-            result = (
-                sheets_service.spreadsheets()
-                .values()
-                .get(spreadsheetId=spreadsheet_id, range=range_notation)
-                .execute()
-            )
-            rows = result.get("values", [])
-            last_row = len(rows) + 1  # 1-indexed, next empty row
-
-            # Check if "CRO Portfolio Comment" label already exists
-            label_row = None
-            for i, row in enumerate(rows):
-                if row and "cro portfolio comment" in str(row[0]).lower():
-                    label_row = i + 1  # 1-indexed
-                    break
-
-            if label_row:
-                # Write comment next to existing label (column B)
-                cell_ref = f"'{sheet_name}'!B{label_row}"
-            else:
-                # Create label + comment in the next empty row (skip one row for spacing)
-                label_ref = f"'{sheet_name}'!A{last_row + 1}"
-                sheets_service.spreadsheets().values().update(
-                    spreadsheetId=spreadsheet_id,
-                    range=label_ref,
-                    valueInputOption="RAW",
-                    body={"values": [["CRO Portfolio Comment"]]},
-                ).execute()
-                cell_ref = f"'{sheet_name}'!B{last_row + 1}"
-
-        sheets_service.spreadsheets().values().update(
-            spreadsheetId=spreadsheet_id,
-            range=cell_ref,
-            valueInputOption="RAW",
-            body={"values": [[comment_text]]},
-        ).execute()
-
-        debug_info["target_cell"] = cell_ref
-        return True, debug_info
-
-    except Exception as exc:
-        logger.error("Failed to write portfolio comment: %s", exc)
-        debug_info["error"] = str(exc)
-        return False, debug_info

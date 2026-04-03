@@ -620,7 +620,7 @@ def _save_all_tabs(session: SessionState, scored_df: pd.DataFrame):
             for account_name, comment_text in account_map.items():
                 cell_info = find_account_cell(
                     sheets_svc, sid, target, account_name,
-                    target_col="next_steps", fallback_col="account_name",
+                    target_col="account_name", fallback_col="account_name",
                 )
                 if not cell_info["found"]:
                     all_debug.append({
