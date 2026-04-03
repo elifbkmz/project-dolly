@@ -585,6 +585,7 @@ def _save_all_tabs(session: SessionState, scored_df: pd.DataFrame):
                             break
                     try:
                         result = add_threaded_comment(drive_svc, sid, decision.final_comment, sheet_gid)
+                        decision.drive_comment_id = result.get("id")
                         all_debug.append({"type": "portfolio", "region": region, "comment_id": result.get("id")})
                         total_written += 1
                     except Exception as exc:
@@ -593,11 +594,13 @@ def _save_all_tabs(session: SessionState, scored_df: pd.DataFrame):
         # ── 2. Account comments → Maps tab (cell-anchored comments via Drive API)
         account_decisions = {k: d for k, d in all_approved.items() if d.comment_type == "account"}
         by_sheet_accounts = defaultdict(dict)
+        account_decision_lookup: dict = {}  # (sid, account_name) → decision
         for key, decision in account_decisions.items():
             if decision.final_comment and decision.spreadsheet_id:
                 parts = key.split("::")
                 account_name = parts[1] if len(parts) >= 2 else key
                 by_sheet_accounts[decision.spreadsheet_id][account_name] = decision.final_comment
+                account_decision_lookup[(decision.spreadsheet_id, account_name)] = decision
 
         for sid, account_map in by_sheet_accounts.items():
             tab_names = detect_sheet_names(sheets_svc, sid)
@@ -641,6 +644,9 @@ def _save_all_tabs(session: SessionState, scored_df: pd.DataFrame):
                         "comment_id": result.get("id"),
                     })
                     total_written += 1
+                    acct_decision = account_decision_lookup.get((sid, account_name))
+                    if acct_decision:
+                        acct_decision.drive_comment_id = result.get("id")
                 except Exception as exc:
                     all_debug.append({
                         "type": "account", "account": account_name,
@@ -650,11 +656,13 @@ def _save_all_tabs(session: SessionState, scored_df: pd.DataFrame):
         # ── 3. Tech stake comments → Tech Stack tab (cell-anchored comments via Drive API)
         tech_decisions = {k: d for k, d in all_approved.items() if d.comment_type == "tech_stake"}
         by_sheet_tech = defaultdict(dict)
+        tech_decision_lookup: dict = {}  # (sid, account_name) → decision
         for key, decision in tech_decisions.items():
             if decision.final_comment and decision.spreadsheet_id:
                 parts = key.split("::")
                 account_name = parts[1] if len(parts) >= 2 else key
                 by_sheet_tech[decision.spreadsheet_id][account_name] = decision.final_comment
+                tech_decision_lookup[(decision.spreadsheet_id, account_name)] = decision
 
         for sid, account_map in by_sheet_tech.items():
             tab_names = detect_sheet_names(sheets_svc, sid)
@@ -699,6 +707,9 @@ def _save_all_tabs(session: SessionState, scored_df: pd.DataFrame):
                         "comment_id": result.get("id"),
                     })
                     total_written += 1
+                    tech_decision = tech_decision_lookup.get((sid, account_name))
+                    if tech_decision:
+                        tech_decision.drive_comment_id = result.get("id")
                 except Exception as exc:
                     all_debug.append({
                         "type": "tech_stake", "account": account_name,
