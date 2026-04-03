@@ -1093,7 +1093,9 @@ def _render_left_panel(
     """
     decisions = session.decisions
     total = len(session.review_order)
-    done = session.approved_count() + session.skipped_count()
+    approved = session.approved_count()
+    skipped = session.skipped_count()
+    done = approved + skipped
 
     # ── Header
     st.markdown(
@@ -1101,7 +1103,11 @@ def _render_left_panel(
         f"<span style='background:#334155;color:#94a3b8;font-size:0.75rem;"
         f"padding:1px 7px;border-radius:10px'>{total}</span>"
         f"&nbsp;&nbsp;"
-        f"<span style='color:#4ade80;font-size:0.8rem'>{done} done</span>",
+        f"<span style='color:#4ade80;font-size:0.8rem'>{approved} approved</span>"
+        f"&nbsp;·&nbsp;"
+        f"<span style='color:#f97316;font-size:0.8rem'>{skipped} skipped</span>"
+        f"&nbsp;·&nbsp;"
+        f"<span style='color:#94a3b8;font-size:0.8rem'>{total - done} remaining</span>",
         unsafe_allow_html=True,
     )
 
