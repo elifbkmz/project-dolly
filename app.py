@@ -106,8 +106,7 @@ def main():
             f"**Welcome to the Global Account Review Agent**\n\n"
             f"Your portfolio has **{total} accounts** scored and prioritized. "
             f"**{p1} critical** and **{p2} at-risk** need your attention. "
-            f"Start with the **Account Review** tab to review and approve CRO comments, "
-            f"then save back to Sheets."
+            f"Start with the **Account Review** tab to review and approve CRO comments."
         )
         if st.button("Got it", key="dismiss_welcome"):
             st.session_state["welcome_dismissed"] = True
