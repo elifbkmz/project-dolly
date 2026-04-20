@@ -4,19 +4,12 @@
 # (visible in the folder URL: drive.google.com/drive/folders/<FOLDER_ID>)
 
 drive:
-  shared_folder_id: "1v_1o1UFoRCk-MGJcuF9RxkGkMo20kaCg"
+  shared_folder_id: "1O7dpnZSDG7jq2N1V7tm7mj7XMFepLGb1"
 
-  # Filename patterns to match regional files.
-  # Uses fnmatch syntax: * matches any characters.
-  # If a pattern matches multiple files, the first match (alphabetical) is used.
-  file_pattern_map:
-    APAC:  "*APAC*"
-    EMEA:  "*EMEA*"
-    LATAM: "*LATAM*"
-    NA:    "*NA*"
-    # Add more regions as needed, e.g.:
-    # MEA:   "*MEA*"
-    # ANZ:   "*ANZ*"
+  # Filename patterns for flat folder structures (optional).
+  # When the folder contains regional subfolders (e.g., EU/, LATAM/, US/),
+  # the app auto-discovers regions from subfolder names and ignores these patterns.
+  file_pattern_map: {}
 
 # Sheet tab name heuristics for auto-detection.
 # The loader checks if a tab name contains any of these keywords (case-insensitive).
