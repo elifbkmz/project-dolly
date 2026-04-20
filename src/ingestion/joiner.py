@@ -82,7 +82,15 @@ def join_region_sheets(
         logger.warning("[%s] Maps tab missing or has no account_name column.", region)
 
     # Add metadata columns
-    result["region"] = region
+    # Region labels may be "EU/Deniz Ficici" — extract the parent folder as region
+    if "/" in region:
+        result["region"] = region.split("/", 1)[0]
+        # Use the AE part as ae_name if not already set
+        ae_from_label = region.split("/", 1)[1].strip()
+        if "ae_name" not in result.columns or result["ae_name"].isna().all():
+            result["ae_name"] = ae_from_label
+    else:
+        result["region"] = region
     result["spreadsheet_id"] = spreadsheet_id
 
     logger.info(
