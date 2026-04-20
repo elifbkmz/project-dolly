@@ -19,9 +19,7 @@ class AccountDecision:
     edited: bool = False          # True if the CRO modified the AI comment
     regenerate_count: int = 0     # How many times Regenerate was clicked
     reviewed_at: Optional[str] = None   # ISO 8601 timestamp
-    spreadsheet_id: Optional[str] = None  # Source sheet for write-back routing
     comment_type: str = "account"       # "portfolio" | "account" | "tech_stake"
-    drive_comment_id: Optional[str] = None  # Drive API comment ID for future reply-to threading
 
     def to_dict(self) -> dict:
         return asdict(self)

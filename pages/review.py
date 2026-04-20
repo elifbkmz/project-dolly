@@ -45,8 +45,8 @@ def render_review_page():
 
     session: SessionState = st.session_state["session"]
 
-    # ── Step indicator
-    _render_step_indicator(session.review_step)
+    # ── Step navigator (freely switchable)
+    _render_step_navigator(session)
 
     # ── Route to current step
     if session.review_step == 1:
@@ -65,44 +65,23 @@ def render_review_page():
 # ── Step indicator ─────────────────────────────────────────────────────────────
 
 
-def _render_step_indicator(current_step: int) -> None:
-    """Render a horizontal step progress indicator."""
+def _render_step_navigator(session: SessionState) -> None:
+    """Render clickable step tabs so the user can jump freely between steps."""
     steps = [
-        (1, "Portfolio Summary", "Overview tab"),
-        (2, "Account Reviews", "Maps tab"),
-        (3, "Tech Stack Reviews", "Tech Stack tab"),
+        (1, "Portfolio Summary"),
+        (2, "Account Reviews"),
+        (3, "Tech Stack Reviews"),
     ]
     cols = st.columns(len(steps))
-    for col, (num, label, target) in zip(cols, steps):
+    for col, (num, label) in zip(cols, steps):
         with col:
-            if num < current_step:
-                # Completed
-                st.markdown(
-                    f"<div style='text-align:center;padding:8px;background:#1a3a2a;"
-                    f"border-radius:6px;border:1px solid #22c55e'>"
-                    f"<span style='color:#22c55e;font-weight:bold'>✓ Step {num}</span><br/>"
-                    f"<span style='color:#86efac;font-size:0.8rem'>{label}</span></div>",
-                    unsafe_allow_html=True,
-                )
-            elif num == current_step:
-                # Active
-                st.markdown(
-                    f"<div style='text-align:center;padding:8px;background:#1e3a5f;"
-                    f"border-radius:6px;border:2px solid #3b82f6'>"
-                    f"<span style='color:#3b82f6;font-weight:bold'>Step {num}</span><br/>"
-                    f"<span style='color:#93c5fd;font-size:0.8rem'>{label}</span><br/>"
-                    f"<span style='color:#64748b;font-size:0.7rem'>→ {target}</span></div>",
-                    unsafe_allow_html=True,
-                )
-            else:
-                # Upcoming
-                st.markdown(
-                    f"<div style='text-align:center;padding:8px;background:#1e293b;"
-                    f"border-radius:6px;border:1px solid #334155'>"
-                    f"<span style='color:#64748b;font-weight:bold'>Step {num}</span><br/>"
-                    f"<span style='color:#475569;font-size:0.8rem'>{label}</span></div>",
-                    unsafe_allow_html=True,
-                )
+            is_active = num == session.review_step
+            btn_type = "primary" if is_active else "secondary"
+            if st.button(label, key=f"step_nav_{num}", use_container_width=True, type=btn_type):
+                if num != session.review_step:
+                    session.review_step = num
+                    st.session_state["session"] = session
+                    st.rerun()
     st.markdown("---")
 
 
@@ -162,12 +141,6 @@ def _render_portfolio_step(scored_df: pd.DataFrame, session: SessionState) -> No
     if existing_decision and existing_decision.status == "approved":
         st.success(f"Portfolio comment for {selected_region} approved.")
         st.text_area("Approved Comment", value=existing_decision.final_comment, disabled=True, height=120)
-
-        # Save to Overview tab button
-        save_col, _ = st.columns([2, 3])
-        with save_col:
-            if st.button("💾 Save to Overview Tab", key=f"save_portfolio_{selected_region}", type="primary"):
-                _save_portfolio_to_sheet(session, scored_df, selected_region)
     else:
         # Generate or retrieve comment
         comment_cache_key = f"portfolio_comment_{selected_region}"
@@ -228,32 +201,11 @@ def _render_portfolio_step(scored_df: pd.DataFrame, session: SessionState) -> No
                     del st.session_state[comment_cache_key]
                 st.rerun()
 
-    # Check if all regions have portfolio comments
-    all_regions_done = all(
-        f"PORTFOLIO::{r}" in session.portfolio_decisions
-        and session.portfolio_decisions[f"PORTFOLIO::{r}"].status == "approved"
-        for r in regions
-    )
-
-    st.markdown("---")
-
-    # Navigation
-    nav1, nav2 = st.columns([3, 1])
-    with nav2:
-        if st.button("Next Step → Account Reviews", key="to_step_2",
-                      type="primary" if all_regions_done else "secondary"):
-            from datetime import datetime, timezone
-            session.review_step = 2
-            session.last_saved_at = datetime.now(timezone.utc).isoformat()
-            save_session(session, DEFAULT_SESSION_DIR)
-            st.session_state["session"] = session
-            st.rerun()
-
-    with nav1:
-        if not all_regions_done:
-            pending = [r for r in regions if f"PORTFOLIO::{r}" not in session.portfolio_decisions
-                       or session.portfolio_decisions[f"PORTFOLIO::{r}"].status != "approved"]
-            st.caption(f"Pending regions: {', '.join(pending)}")
+    # Show pending regions status
+    pending = [r for r in regions if f"PORTFOLIO::{r}" not in session.portfolio_decisions
+               or session.portfolio_decisions[f"PORTFOLIO::{r}"].status != "approved"]
+    if pending:
+        st.caption(f"Pending regions: {', '.join(pending)}")
 
 
 # ── Step 3: Tech Stack Reviews ────────────────────────────────────────────────
@@ -279,7 +231,7 @@ def _render_tech_stake_step(scored_df: pd.DataFrame, session: SessionState) -> N
 
     if not session.tech_stake_order:
         st.info("No accounts with vendor gaps found (ARR > $5K). Tech stake review complete.")
-        _render_save_all_button(session, scored_df)
+        _render_review_summary(session)
         return
 
     # Two-panel layout
@@ -401,7 +353,6 @@ def _render_tech_stake_step(scored_df: pd.DataFrame, session: SessionState) -> N
                         original_comment=ts_comment,
                         edited=edited.strip() != ts_comment.strip(),
                         comment_type="tech_stake",
-                        spreadsheet_id=str(account_row.get("spreadsheet_id", "")) or None,
                     )
                     session.tech_stake_decisions[selected_key] = decision
                     save_session(session, DEFAULT_SESSION_DIR)
@@ -435,306 +386,37 @@ def _render_tech_stake_step(scored_df: pd.DataFrame, session: SessionState) -> N
                         del st.session_state[ts_comment_key]
                     st.rerun()
 
-    # Save all button
+    # Review summary
     st.markdown("---")
-    _render_save_all_button(session, scored_df)
-
-    # Back button
-    if st.button("← Back to Account Reviews", key="back_to_step2"):
-        session.review_step = 2
-        st.session_state["session"] = session
-        st.rerun()
+    _render_review_summary(session)
 
 
-# ── Portfolio save ────────────────────────────────────────────────────────────
+# ── Session export ────────────────────────────────────────────────────────────
 
 
-def _save_portfolio_to_sheet(session: SessionState, scored_df: pd.DataFrame, region: str):
-    """Write the approved portfolio comment as a threaded comment on the Overview tab."""
-    from src.google.auth import get_google_credentials
-    from src.google.drive_client import build_drive_service, add_threaded_comment
-    from src.google.sheets_client import build_sheets_service, detect_sheet_names
-
-    region_key = f"PORTFOLIO::{region}"
-    decision = session.portfolio_decisions.get(region_key)
-    if not decision or not decision.final_comment:
-        st.warning("No approved portfolio comment to save.")
-        return
-
-    try:
-        creds = get_google_credentials()
-        drive_svc = build_drive_service(creds)
-        sheets_svc = build_sheets_service(creds)
-
-        # Find the spreadsheet ID for this region
-        region_rows = scored_df[scored_df["region"] == region] if "region" in scored_df.columns else scored_df
-        if region_rows.empty:
-            st.error(f"No data found for region {region}.")
-            return
-
-        sid = str(region_rows.iloc[0].get("spreadsheet_id", ""))
-        if not sid:
-            st.error("No spreadsheet ID found for this region.")
-            return
-
-        # Find the Overview tab name and its gid
-        tab_names = detect_sheet_names(sheets_svc, sid)
-        target = next((t for t in tab_names if "overview" in t.lower()), "Overview")
-
-        if target not in tab_names:
-            st.error(f"Tab '{target}' not found in spreadsheet. Available: {tab_names}")
-            return
-
-        # Get sheet gid from spreadsheet properties
-        sheet_metadata = sheets_svc.spreadsheets().get(
-            spreadsheetId=sid, fields="sheets.properties"
-        ).execute()
-        sheet_gid = 0
-        for sheet in sheet_metadata.get("sheets", []):
-            props = sheet.get("properties", {})
-            if props.get("title") == target:
-                sheet_gid = props.get("sheetId", 0)
-                break
-
-        # Add comment anchored to the Overview sheet tab
-        result = add_threaded_comment(
-            drive_service=drive_svc,
-            file_id=sid,
-            comment_text=decision.final_comment,
-            sheet_gid=sheet_gid,
-        )
-
-        comment_id = result.get("id", "unknown")
-        st.success(
-            f"Portfolio comment saved to '{target}' tab — comment #{comment_id}"
-        )
-
-        with st.expander("Comment details"):
-            st.json(result)
-
-    except Exception as exc:
-        st.error(f"Save failed: {exc}")
-
-
-# ── Multi-tab save ────────────────────────────────────────────────────────────
-
-
-def _render_save_all_button(session: SessionState, scored_df: pd.DataFrame) -> None:
-    """Render a save button that writes all approved comments to their respective tabs."""
+def _render_review_summary(session: SessionState) -> None:
+    """Render a summary of all approved comments across all review steps."""
     all_approved = session.all_approved_decisions()
     if not all_approved:
-        st.info("No approved comments to save yet.")
+        st.info("No approved comments yet.")
         return
 
-    # Count by type
     portfolio_count = sum(1 for d in all_approved.values() if d.comment_type == "portfolio")
     account_count = sum(1 for d in all_approved.values() if d.comment_type == "account")
     tech_count = sum(1 for d in all_approved.values() if d.comment_type == "tech_stake")
 
-    label = f"Save All ({portfolio_count} portfolio + {account_count} account + {tech_count} tech stake)"
-    if st.button(label, key="save_all_tabs", type="primary"):
-        _save_all_tabs(session, scored_df)
-
-
-def _save_all_tabs(session: SessionState, scored_df: pd.DataFrame):
-    """Write approved comments to their respective tabs (Overview, Maps, Tech Stack)."""
-    from src.google.auth import get_google_credentials
-    from src.google.drive_client import build_drive_service, add_threaded_comment, add_cell_comment
-    from src.google.sheets_client import (
-        build_sheets_service, detect_sheet_names, find_account_cell,
+    st.success(
+        f"Review complete: {portfolio_count} portfolio + {account_count} account "
+        f"+ {tech_count} tech stake comments approved."
     )
-    from src.utils.config_loader import load_regions_config
-    from collections import defaultdict
 
-    try:
-        creds = get_google_credentials()
-        sheets_svc = build_sheets_service(creds)
-        drive_svc = build_drive_service(creds)
-        regions_config = load_regions_config()
-        write_tabs = regions_config.get("comment_write_tabs", {})
-        portfolio_tab = write_tabs.get("portfolio", "Overview")
-        accounts_tab = write_tabs.get("accounts",
-                                       regions_config.get("comment_write_tab", "Maps"))
-        tech_stake_tab = write_tabs.get("tech_stake", "Current Tech Stake Information")
 
-        total_written = 0
-        all_debug = []
-        all_approved = session.all_approved_decisions()
-
-        # ── 1. Portfolio comments → Overview tab (threaded comment via Drive API)
-        portfolio_decisions = {k: d for k, d in all_approved.items() if d.comment_type == "portfolio"}
-        for key, decision in portfolio_decisions.items():
-            if not decision.final_comment:
-                continue
-            region = key.replace("PORTFOLIO::", "")
-            region_rows = scored_df[scored_df["region"] == region] if "region" in scored_df.columns else scored_df
-            if not region_rows.empty:
-                sid = str(region_rows.iloc[0].get("spreadsheet_id", ""))
-                if sid:
-                    tab_names = detect_sheet_names(sheets_svc, sid)
-                    target = next((t for t in tab_names if "overview" in t.lower()), portfolio_tab)
-                    # Get sheet gid
-                    sheet_metadata = sheets_svc.spreadsheets().get(
-                        spreadsheetId=sid, fields="sheets.properties"
-                    ).execute()
-                    sheet_gid = 0
-                    for sheet in sheet_metadata.get("sheets", []):
-                        props = sheet.get("properties", {})
-                        if props.get("title") == target:
-                            sheet_gid = props.get("sheetId", 0)
-                            break
-                    try:
-                        result = add_threaded_comment(drive_svc, sid, decision.final_comment, sheet_gid)
-                        decision.drive_comment_id = result.get("id")
-                        all_debug.append({"type": "portfolio", "region": region, "comment_id": result.get("id")})
-                        total_written += 1
-                    except Exception as exc:
-                        all_debug.append({"type": "portfolio", "region": region, "error": str(exc)})
-
-        # ── 2. Account comments → Maps tab (cell-anchored comments via Drive API)
-        account_decisions = {k: d for k, d in all_approved.items() if d.comment_type == "account"}
-        by_sheet_accounts = defaultdict(dict)
-        account_decision_lookup: dict = {}  # (sid, account_name) → decision
-        for key, decision in account_decisions.items():
-            if decision.final_comment and decision.spreadsheet_id:
-                parts = key.split("::")
-                account_name = parts[1] if len(parts) >= 2 else key
-                by_sheet_accounts[decision.spreadsheet_id][account_name] = decision.final_comment
-                account_decision_lookup[(decision.spreadsheet_id, account_name)] = decision
-
-        for sid, account_map in by_sheet_accounts.items():
-            tab_names = detect_sheet_names(sheets_svc, sid)
-            target = accounts_tab if accounts_tab in tab_names else next(
-                (t for t in tab_names if "map" in t.lower()), tab_names[0] if tab_names else None
-            )
-            if not target:
-                continue
-            # Get sheet gid for anchor
-            sheet_metadata = sheets_svc.spreadsheets().get(
-                spreadsheetId=sid, fields="sheets.properties"
-            ).execute()
-            sheet_gid = 0
-            for sheet in sheet_metadata.get("sheets", []):
-                props = sheet.get("properties", {})
-                if props.get("title") == target:
-                    sheet_gid = props.get("sheetId", 0)
-                    break
-
-            for account_name, comment_text in account_map.items():
-                cell_info = find_account_cell(
-                    sheets_svc, sid, target, account_name,
-                    target_col="account_name", fallback_col="account_name",
-                )
-                if not cell_info["found"]:
-                    all_debug.append({
-                        "type": "account", "account": account_name,
-                        "error": cell_info["debug"],
-                    })
-                    continue
-                try:
-                    result = add_cell_comment(
-                        drive_svc, sid, comment_text,
-                        sheet_gid=sheet_gid,
-                        cell_ref=cell_info["cell_ref"],
-                        quoted_text=cell_info["cell_text"],
-                    )
-                    all_debug.append({
-                        "type": "account", "account": account_name,
-                        "cell": cell_info["cell_ref"],
-                        "comment_id": result.get("id"),
-                    })
-                    total_written += 1
-                    acct_decision = account_decision_lookup.get((sid, account_name))
-                    if acct_decision:
-                        acct_decision.drive_comment_id = result.get("id")
-                except Exception as exc:
-                    all_debug.append({
-                        "type": "account", "account": account_name,
-                        "error": str(exc),
-                    })
-
-        # ── 3. Tech stake comments → Tech Stack tab (cell-anchored comments via Drive API)
-        tech_decisions = {k: d for k, d in all_approved.items() if d.comment_type == "tech_stake"}
-        by_sheet_tech = defaultdict(dict)
-        tech_decision_lookup: dict = {}  # (sid, account_name) → decision
-        for key, decision in tech_decisions.items():
-            if decision.final_comment and decision.spreadsheet_id:
-                parts = key.split("::")
-                account_name = parts[1] if len(parts) >= 2 else key
-                by_sheet_tech[decision.spreadsheet_id][account_name] = decision.final_comment
-                tech_decision_lookup[(decision.spreadsheet_id, account_name)] = decision
-
-        for sid, account_map in by_sheet_tech.items():
-            tab_names = detect_sheet_names(sheets_svc, sid)
-            target = tech_stake_tab if tech_stake_tab in tab_names else next(
-                (t for t in tab_names if "tech" in t.lower() and "stake" in t.lower()),
-                next((t for t in tab_names if "tech" in t.lower()), None)
-            )
-            if not target:
-                continue
-            # Get sheet gid for anchor
-            sheet_metadata = sheets_svc.spreadsheets().get(
-                spreadsheetId=sid, fields="sheets.properties"
-            ).execute()
-            sheet_gid = 0
-            for sheet in sheet_metadata.get("sheets", []):
-                props = sheet.get("properties", {})
-                if props.get("title") == target:
-                    sheet_gid = props.get("sheetId", 0)
-                    break
-
-            for account_name, comment_text in account_map.items():
-                cell_info = find_account_cell(
-                    sheets_svc, sid, target, account_name,
-                    target_col="account_name", fallback_col="account_name",
-                )
-                if not cell_info["found"]:
-                    all_debug.append({
-                        "type": "tech_stake", "account": account_name,
-                        "error": cell_info["debug"],
-                    })
-                    continue
-                try:
-                    result = add_cell_comment(
-                        drive_svc, sid, comment_text,
-                        sheet_gid=sheet_gid,
-                        cell_ref=cell_info["cell_ref"],
-                        quoted_text=cell_info["cell_text"],
-                    )
-                    all_debug.append({
-                        "type": "tech_stake", "account": account_name,
-                        "cell": cell_info["cell_ref"],
-                        "comment_id": result.get("id"),
-                    })
-                    total_written += 1
-                    tech_decision = tech_decision_lookup.get((sid, account_name))
-                    if tech_decision:
-                        tech_decision.drive_comment_id = result.get("id")
-                except Exception as exc:
-                    all_debug.append({
-                        "type": "tech_stake", "account": account_name,
-                        "error": str(exc),
-                    })
-
-        # Results
-        if total_written > 0:
-            st.success(f"Written {total_written} comment(s) across all tabs!")
-        else:
-            st.error("0 comments written — check diagnostics below.")
-
-        with st.expander("Multi-tab write-back diagnostics", expanded=(total_written == 0)):
-            for entry in all_debug:
-                st.json(entry)
-
-    except Exception as exc:
-        st.error(f"Multi-tab save failed: {exc}")
 
 
 # ── Action handlers ───────────────────────────────────────────────────────────
 
 def _handle_approve(session, account_key, final_comment, original_comment, edited, row):
     regen_count = st.session_state.get(f"regen_{account_key}", 0)
-    spreadsheet_id = str(row.get("spreadsheet_id", "")) or None
 
     st.session_state["session"] = record_decision(
         session,
@@ -744,7 +426,6 @@ def _handle_approve(session, account_key, final_comment, original_comment, edite
         original_comment=original_comment,
         edited=edited,
         regenerate_count=regen_count,
-        spreadsheet_id=spreadsheet_id,
     )
     save_session(st.session_state["session"], DEFAULT_SESSION_DIR)
     approved_so_far = st.session_state["session"].approved_count()
@@ -788,112 +469,6 @@ def _handle_regenerate(account_key, row, scoring, model):
             st.rerun()
         except Exception as exc:
             st.error(f"Regeneration failed: {exc}")
-
-
-def _save_to_master(session: SessionState, scored_df: pd.DataFrame):
-    """Write all approved comments back to Google Sheets as cell comments."""
-    approved = session.approved_decisions()
-    if not approved:
-        st.warning("No approved comments to save.")
-        return
-
-    from src.google.auth import get_google_credentials
-    from src.google.drive_client import build_drive_service, add_cell_comment
-    from src.google.sheets_client import (
-        build_sheets_service, detect_sheet_names, find_account_cell,
-    )
-
-    try:
-        creds = get_google_credentials()
-        sheets_svc = build_sheets_service(creds)
-        drive_svc = build_drive_service(creds)
-
-        # Group by spreadsheet_id
-        from collections import defaultdict
-        by_sheet: dict[str, dict[str, str]] = defaultdict(dict)
-        for key, decision in approved.items():
-            if decision.final_comment and decision.spreadsheet_id:
-                parts = key.split("::")
-                account_name = parts[1] if len(parts) >= 2 else key
-                by_sheet[decision.spreadsheet_id][account_name] = decision.final_comment
-
-        from src.utils.config_loader import load_regions_config
-        regions_config = load_regions_config()
-        comment_write_tab = regions_config.get("comment_write_tab") or \
-            (regions_config.get("explicit_sheet_names") or {}).get("maps") or "Maps"
-
-        if not by_sheet:
-            st.warning("No approved comments with a valid spreadsheet ID found. "
-                       "Approve at least one account before saving.")
-            return
-
-        total_written = 0
-        all_debug: list = []
-        for spreadsheet_id, account_map in by_sheet.items():
-            tab_names = detect_sheet_names(sheets_svc, spreadsheet_id)
-
-            if comment_write_tab in tab_names:
-                target_tab = comment_write_tab
-            else:
-                target_tab = next(
-                    (t for t in tab_names if "map" in t.lower() or "tech" in t.lower()),
-                    tab_names[0] if tab_names else None,
-                )
-
-            if not target_tab:
-                st.warning(f"Could not find write target tab in spreadsheet {spreadsheet_id}")
-                continue
-
-            # Get sheet gid
-            sheet_metadata = sheets_svc.spreadsheets().get(
-                spreadsheetId=spreadsheet_id, fields="sheets.properties"
-            ).execute()
-            sheet_gid = 0
-            for sheet in sheet_metadata.get("sheets", []):
-                props = sheet.get("properties", {})
-                if props.get("title") == target_tab:
-                    sheet_gid = props.get("sheetId", 0)
-                    break
-
-            for account_name, comment_text in account_map.items():
-                cell_info = find_account_cell(
-                    sheets_svc, spreadsheet_id, target_tab, account_name,
-                    target_col="account_name", fallback_col="account_name",
-                )
-                if not cell_info["found"]:
-                    all_debug.append({
-                        "account": account_name, "error": cell_info["debug"],
-                    })
-                    continue
-                try:
-                    result = add_cell_comment(
-                        drive_svc, spreadsheet_id, comment_text,
-                        sheet_gid=sheet_gid,
-                        cell_ref=cell_info["cell_ref"],
-                        quoted_text=cell_info["cell_text"],
-                    )
-                    all_debug.append({
-                        "account": account_name,
-                        "cell": cell_info["cell_ref"],
-                        "comment_id": result.get("id"),
-                    })
-                    total_written += 1
-                except Exception as exc:
-                    all_debug.append({
-                        "account": account_name, "error": str(exc),
-                    })
-
-        if total_written > 0:
-            st.success(f"Written {total_written} comment(s) to Google Sheets!")
-        else:
-            st.error("0 comments written — check diagnostics below.")
-
-        with st.expander("Write-back diagnostics", expanded=(total_written == 0)):
-            for entry in all_debug:
-                st.json(entry)
-
-    except Exception as exc:
-        st.error(f"Save to Master failed: {exc}")
 
 
 # ── Internal helpers ──────────────────────────────────────────────────────────
@@ -1281,17 +856,6 @@ def _render_right_panel(scored_df: pd.DataFrame, session: "SessionState") -> Non
 
     if not pending_in_filter and selected_key in session.decisions:
         st.success("All account reviews complete!")
-        col_save, col_next = st.columns(2)
-        with col_save:
-            if st.button("Save Account Comments to Maps"):
-                _save_to_master(session, scored_df)
-        with col_next:
-            if st.button("Next Step → Tech Stack Reviews", type="primary"):
-                session.review_step = 3
-                save_session(session, DEFAULT_SESSION_DIR)
-                st.session_state["session"] = session
-                st.rerun()
-        return
 
     # ── Load account data
     account_df = _find_account_row(scored_df, selected_key)
@@ -1333,7 +897,7 @@ def _render_right_panel(scored_df: pd.DataFrame, session: "SessionState") -> Non
 
     # ── Action bar
     st.markdown("---")
-    action_cols = st.columns([2, 1.5, 2, 1])
+    action_cols = st.columns([2, 1.5, 2])
     was_edited = edited_comment.strip() != comment.strip()
 
     with action_cols[0]:
@@ -1353,12 +917,6 @@ def _render_right_panel(scored_df: pd.DataFrame, session: "SessionState") -> Non
             st.rerun()
 
     with action_cols[2]:
-        approved_count = session.approved_count()
-        save_label = f"💾 Save {approved_count} to Sheets" if approved_count > 0 else "💾 Save to Sheets"
-        if st.button(save_label, key=f"save_{selected_key}", use_container_width=True):
-            _save_to_master(session, scored_df)
-
-    with action_cols[3]:
         st.markdown(
             "<span style='color:#475569;font-size:0.75rem'>← → to navigate</span>",
             unsafe_allow_html=True,

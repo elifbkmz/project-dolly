@@ -123,5 +123,16 @@ def join_all_regions(
 
 
 def get_account_key(row: pd.Series) -> str:
-    """Return the unique composite key for an account: 'REGION::AccountName'."""
-    return f"{row.get('region', 'UNKNOWN')}::{row.get('account_name', 'UNKNOWN')}"
+    """Return a unique composite key for an account row.
+
+    Format: 'REGION::AccountName::AE_Name'
+    The AE name is included because Maps-tab joins can produce multiple rows
+    for the same account (different AEs/territories), each needing its own
+    comment.  If ae_name is missing or empty, falls back to 'REGION::AccountName'.
+    """
+    region = row.get("region", "UNKNOWN")
+    account = row.get("account_name", "UNKNOWN")
+    ae = str(row.get("ae_name", "") or "").strip()
+    if ae and ae.lower() not in ("nan", "n/a", "none", ""):
+        return f"{region}::{account}::{ae}"
+    return f"{region}::{account}"

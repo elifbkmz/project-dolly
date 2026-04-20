@@ -232,8 +232,9 @@ def section_approved_comments(scored_df: pd.DataFrame, session=None) -> str:
     from collections import defaultdict
     by_region: dict[str, list] = defaultdict(list)
     for key, decision in approved.items():
-        region = key.split("::")[0]
-        account = key.split("::", 1)[-1]
+        parts = key.split("::")
+        region = parts[0]
+        account = parts[1] if len(parts) >= 2 else key
         by_region[region].append((account, decision))
 
     for region in sorted(by_region.keys()):

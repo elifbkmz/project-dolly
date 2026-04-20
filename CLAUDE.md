@@ -8,7 +8,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Project Dolly is a Streamlit web app that reads multi-regional Google Sheets account planning data, applies strategic scoring logic, generates AI-voiced CRO comments via Claude, and enables a human-in-the-loop review workflow with write-back to Google Sheets.
+Project Dolly is a Streamlit web app that reads multi-regional Google Sheets account planning data, applies strategic scoring logic, generates AI-voiced CRO comments via Claude, and enables a human-in-the-loop review workflow. Comments are reviewed and approved in the app but are not written back to Google Sheets.
 
 ## Commands
 
@@ -57,8 +57,6 @@ Streamlit UI (app.py → pages/)
 Claude API (src/llm/) — comment generation with exponential-backoff retry
     ↓
 user approve/edit/regenerate → auto-save JSON session
-    ↓
-optional Sheets write-back — approved comments routed to original spreadsheet_id per account
 ```
 
 ### Scoring Engine (`src/scoring/`)
@@ -90,9 +88,13 @@ Anything a CRO (non-engineer) might want to tune lives in `config/*.yaml`:
 
 | File | Controls |
 |---|---|
-| `regions.yaml` | Drive folder ID, file patterns, sheet type keywords, write-back tab |
+| `regions.yaml` | Drive folder ID, file patterns, sheet type keywords |
 | `scoring_weights.yaml` | NRR/threading/expansion thresholds, P-tier cutoffs, hard override rules |
 | `column_mappings.yaml` | Column name aliases, channel definitions, insider/whitespace/competitor markers |
 | `cro_persona.yaml` | CRO name, title, philosophy paragraph, voice rules |
 | `prompt_templates.yaml` | System + user prompt templates with `{placeholder}` variables |
 | `cro_tone_profile.yaml` | **Auto-generated** by `tone_scraper.py` — do not edit manually |
+
+### What This App Does NOT Do
+
+- **No write-back to Google Sheets.** The app reads from Sheets and generates CRO comments, but approved comments are saved only to local JSON sessions. They are not posted as comments or notes on the source spreadsheets.

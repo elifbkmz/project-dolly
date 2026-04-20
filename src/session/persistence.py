@@ -148,7 +148,6 @@ def record_decision(
     original_comment: Optional[str] = None,
     edited: bool = False,
     regenerate_count: int = 0,
-    spreadsheet_id: Optional[str] = None,
 ) -> SessionState:
     """
     Record an account decision and advance the session position.
@@ -161,7 +160,6 @@ def record_decision(
         original_comment: AI-generated original (before any edits).
         edited: True if the CRO modified the comment.
         regenerate_count: Number of times regenerate was clicked.
-        spreadsheet_id: Source spreadsheet ID for write-back.
 
     Returns:
         Updated SessionState.
@@ -175,7 +173,6 @@ def record_decision(
         edited=edited,
         regenerate_count=regenerate_count,
         reviewed_at=now,
-        spreadsheet_id=spreadsheet_id,
     )
     session.current_index += 1
     session.last_saved_at = now

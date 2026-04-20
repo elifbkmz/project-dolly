@@ -10,6 +10,24 @@ An AI assistant trained on the CRO's meeting transcripts, documents, decisions, 
 
 ---
 
+## Sub-Project Status: Account Review App (Project Dolly v1) — COMPLETE
+
+The Account Review Streamlit app is **finished**. It:
+
+- Reads multi-regional account planning data from Google Sheets (Maps, Tech Stake, Summary tabs)
+- Applies NRR/threading/expansion scoring with configurable weights
+- Generates CRO-voiced comments via Claude (Sonnet or Opus, user-selectable)
+- Provides a 3-step human-in-the-loop review workflow:
+  1. **Portfolio Summary** — regional overview comments
+  2. **Account Reviews** — per-account CRO comments (sorted by MRR, filterable by tier/region/AE)
+  3. **Tech Stack Reviews** — vendor gap analysis comments
+- Saves all review decisions to local JSON sessions (resumable)
+- Generates downloadable Markdown executive reports
+
+**Scope decision:** The app does **not** write comments back to Google Sheets. Comments are generated, reviewed, and approved within the app only. Write-back was explored but removed from scope.
+
+---
+
 ## Phase 1: Knowledge Capture *(Weeks 1–6)*
 
 The foundation of the entire system. Nothing can be built without this.
@@ -154,6 +172,87 @@ Every time the CRO corrects the AI:
 
 ---
 
+## Sub-Project: Partner Email Generator (Dolly Outreach)
+
+> **Objective**: Generate weekly CRO-voiced partner emails — drafted by AI in Serhat's tone, reviewed and sent by Serhat himself.
+
+### What It Is
+
+A lightweight, standalone module under the Dolly umbrella. AEs and CSMs submit partner names (and optional context like relationship status, recent meetings, or deal stage), and the system drafts personalized outreach emails in Serhat's voice. No scoring, no data pipelines — just high-quality writing that sounds like Serhat wrote it himself.
+
+### Cadence
+
+4 partner emails per week. AEs/CSMs provide the partner names and any relevant context; the AI drafts; Serhat reviews, edits if needed, and sends.
+
+### How It Works
+
+```
+AE/CSM submits partner name + optional context (Slack, form, or simple UI)
+    ↓
+Partner Email Generator pulls Serhat's voice profile (cro_persona.yaml + cro_tone_profile.yaml)
+    ↓
+Claude drafts a personalized partner email using:
+  - Partner name and company
+  - Any context provided by AE/CSM (relationship notes, recent activity, goal of outreach)
+  - Serhat's communication style, vocabulary, and tone
+    ↓
+Serhat reviews the draft in a simple UI or receives it via email/Slack
+    ↓
+Serhat edits (if needed) → sends directly
+```
+
+### Input
+
+| Field | Required? | Source |
+|---|---|---|
+| Partner company name | Yes | AE/CSM |
+| Contact name + title | Yes | AE/CSM |
+| Context / goal of the email | Optional | AE/CSM (e.g., "re-engage after quiet Q4", "intro after partner event", "follow up on co-sell opportunity") |
+| Relationship history | Optional | AE/CSM or CRM if integrated later |
+
+### Email Types (Initial Scope)
+
+| Type | Description |
+|---|---|
+| Warm intro / first touch | CRO reaching out to a new partner contact |
+| Re-engagement | Reviving a quiet or dormant partner relationship |
+| Follow-up | After a meeting, event, or milestone |
+| Strategic alignment | Proposing a co-sell, joint initiative, or deeper collaboration |
+
+### Voice & Tone
+
+Reuses the same CRO voice infrastructure already built for Project Dolly (Account Review):
+- `cro_persona.yaml` — Serhat's philosophy, title, framing
+- `cro_tone_profile.yaml` — sentence patterns, vocabulary, action orientation extracted from his real writing
+- Prompt templates specific to partner emails (new `partner_email_templates.yaml`)
+
+### Technical Approach
+
+- **Standalone app or new tab** within the Dolly ecosystem (TBD — could be a simple Streamlit page, a Slack workflow, or a lightweight web form)
+- **No data pipeline required** — input is manual (partner name + context from AE/CSM)
+- **Same Claude API integration** as account review (src/llm/client.py with retry logic)
+- **New prompt templates** tailored to partner outreach (different from account review prompts)
+- **Draft history** saved locally (JSON or simple DB) so Serhat can reference past emails to the same partner
+
+### Build Estimate
+
+| Item | Estimate | Notes |
+|---|---|---|
+| Prompt template design | 1–2 days | Partner-specific templates + few-shot examples |
+| UI / input form | 1–2 days | Simple form: partner name, contact, context, email type |
+| Draft generation + review flow | 1–2 days | Generate → preview → edit → copy/send |
+| Voice calibration for partner tone | 1 day | May need additional tone examples beyond account review voice |
+| **Total** | **4–7 days** | Leverages existing Dolly infrastructure |
+
+### Open Questions for Serhat
+
+- Should the email drafts be delivered via the Streamlit app, Slack, or email?
+- Are there specific partner email examples we can use for tone calibration (similar to how we used "Next Steps" for account comments)?
+- Should the system track which partners have been emailed and when, or is that handled elsewhere?
+- Any standard email structure preferences (e.g., always open with a specific kind of hook, always include a CTA)?
+
+---
+
 ## Timeline Summary
 
 | Phase | Weeks |
@@ -212,6 +311,7 @@ Every time the CRO corrects the AI:
 3. **Schedule structured interview sessions** with the CRO (block 10–15 hrs over 3–4 weeks)
 4. **Begin artifact collection** — CRM notes, emails, Slack, existing playbooks
 5. **Map every process** the CRO is involved in (this will determine exact module scope)
+6. **Partner Email Generator** — Collect 5–10 sample partner emails from Serhat for tone calibration; design prompt templates; build input form and draft review flow
 
 ---
 
@@ -224,6 +324,7 @@ Every time the CRO corrects the AI:
 | AI drifts as strategy evolves | Quarterly rubric reviews + continuous feedback loop |
 | Over-reliance on AI for high-stakes decisions | Keep CRO in the loop for Wave 3 processes until confidence is high |
 | Data quality is inconsistent early on | Start with most structured processes first |
+| Partner emails sound generic without enough context | Require AEs/CSMs to provide at least a one-line context; build a "context prompt" to guide them |
 
 ---
 

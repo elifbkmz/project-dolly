@@ -48,12 +48,3 @@ explicit_sheet_names:
   maps: "Maps"
   tech_stake: "Current Tech Stake Information"
   summary: "Account Summary"
-
-# Tab where CRO-approved comments are written back, per review step.
-comment_write_tabs:
-  portfolio: "Overview"
-  accounts: "Maps"
-  tech_stake: "Current Tech Stake Information"
-
-# Legacy key for backward compatibility
-comment_write_tab: "Maps"
