@@ -31,20 +31,21 @@ st.set_page_config(
 
 # ── Shared data loading (cached across all pages) ────────────────────────────
 
-@st.cache_data(ttl=1800, show_spinner="Loading regional data from Google Sheets...")
+@st.cache_data(ttl=1800, show_spinner=False)
 def load_master_data():
     """
     Load, normalize, join, and score all regional data from Google Sheets.
     Cached for 30 minutes (ttl=1800 seconds).
-    Returns the scored master DataFrame.
+    Loads spreadsheets in batches with progress updates.
     """
+    import gc
     from src.google.auth import get_google_credentials
     from src.google.drive_client import build_drive_service, discover_regional_files
     from src.google.sheets_client import build_sheets_service
-    from src.ingestion.loader import load_all_regions
+    from src.ingestion.loader import load_region_from_sheets
     from src.ingestion.joiner import join_all_regions
     from src.scoring.engine import run_scoring_pipeline
-    from src.utils.config_loader import load_regions_config, load_column_mappings, load_scoring_weights
+    from src.utils.config_loader import load_regions_config, load_column_mappings
     from src.utils.validators import validate_master_df
 
     creds = get_google_credentials()
@@ -54,9 +55,6 @@ def load_master_data():
     regions_config = load_regions_config()
     col_mapping = load_column_mappings()
 
-    all_region_data = load_all_regions(drive_svc, sheets_svc, regions_config, col_mapping)
-
-    # Discover spreadsheet IDs for write-back routing
     drive_config = regions_config.get("drive", {})
     regional_ids = discover_regional_files(
         drive_svc,
@@ -64,12 +62,36 @@ def load_master_data():
         drive_config.get("file_pattern_map", {}),
     )
 
+    # Load spreadsheets one at a time with progress
+    all_region_data = {}
+    progress = st.progress(0, text="Loading spreadsheets from Google Sheets...")
+    items = list(regional_ids.items())
+    for i, (region, spreadsheet_id) in enumerate(items):
+        progress.progress((i + 1) / len(items), text=f"Loading {region}... ({i+1}/{len(items)})")
+        try:
+            all_region_data[region] = load_region_from_sheets(
+                sheets_svc, spreadsheet_id, region, regions_config, col_mapping
+            )
+        except Exception:
+            all_region_data[region] = {}
+        # Free memory between loads
+        if i % 10 == 9:
+            gc.collect()
+
+    progress.empty()
+
     master_df = join_all_regions(all_region_data, regional_ids)
+    del all_region_data
+    gc.collect()
+
     warnings = validate_master_df(master_df)
     for w in warnings:
         st.warning(w)
 
     scored_df = run_scoring_pipeline(master_df)
+    del master_df
+    gc.collect()
+
     return scored_df
 
 
