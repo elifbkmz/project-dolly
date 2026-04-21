@@ -171,9 +171,26 @@ def read_sheet_as_dataframe(
     df = pd.DataFrame(padded_rows, columns=headers)
     # Drop fully empty rows
     df = df[df.apply(lambda r: any(str(v).strip() for v in r), axis=1)].reset_index(drop=True)
+    # Deduplicate column names (some sheets have repeated headers)
+    seen = {}
+    new_cols = []
+    for col in df.columns:
+        if col in seen:
+            seen[col] += 1
+            new_cols.append(f"{col}_{seen[col]}")
+        else:
+            seen[col] = 0
+            new_cols.append(col)
+    df.columns = new_cols
+
+    # Drop columns that are entirely empty (saves memory on wide sheets)
+    empty_mask = df.fillna("").astype(str).apply(lambda c: c.str.strip().eq("").all())
+    empty_cols = empty_mask[empty_mask].index.tolist()
+    if empty_cols:
+        df = df.drop(columns=empty_cols)
     logger.info(
-        "Read '%s' from %s: %d rows × %d columns",
-        sheet_name, spreadsheet_id, len(df), len(df.columns),
+        "Read '%s' from %s: %d rows × %d columns (dropped %d empty cols)",
+        sheet_name, spreadsheet_id, len(df), len(df.columns), len(empty_cols),
     )
     return df
 

@@ -125,6 +125,19 @@ def join_all_regions(
         return pd.DataFrame()
 
     master = pd.concat(regional_dfs, ignore_index=True, sort=False)
+    # Drop rows with empty account_name (saves memory on bloated sheets)
+    if "account_name" in master.columns:
+        before = len(master)
+        master = master[master["account_name"].astype(str).str.strip().str.len() > 0].reset_index(drop=True)
+        dropped = before - len(master)
+        if dropped:
+            logger.info("Dropped %d rows with empty account_name", dropped)
+    # Drop columns that are all empty across the entire master
+    empty_mask = master.fillna("").astype(str).apply(lambda c: c.str.strip().eq("").all())
+    empty_cols = empty_mask[empty_mask].index.tolist()
+    if empty_cols:
+        master = master.drop(columns=empty_cols)
+        logger.info("Dropped %d fully empty columns from master", len(empty_cols))
     n_regions = master["region"].nunique() if "region" in master.columns else 0
     logger.info("Master DataFrame: %d total accounts across %d region(s)", len(master), n_regions)
     return master
