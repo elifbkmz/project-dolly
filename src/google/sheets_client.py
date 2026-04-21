@@ -1,13 +1,14 @@
 """
-Google Sheets client for reading account planning data and writing back CRO comments.
+Google Sheets client for reading account planning data.
 
 Provides:
 - Reading any named tab as a pandas DataFrame
 - Detecting available tab names in a spreadsheet
-- Batch-writing CRO-approved comments back to a Summary tab
+- Rate-limit retry for Google Sheets API (60 reads/min/user)
 """
 
 import logging
+import time
 from typing import Optional, List, Dict
 
 import pandas as pd
@@ -16,6 +17,36 @@ from googleapiclient.errors import HttpError
 from google.oauth2 import service_account
 
 logger = logging.getLogger(__name__)
+
+# Sheets API quota: 60 reads/min/user. Proactively pace calls to stay under.
+_MAX_RETRIES = 3
+_RETRY_DELAY = 15  # seconds
+_MIN_CALL_INTERVAL = 1.1  # seconds between calls (~54/min, safe margin)
+_last_call_ts: float = 0.0
+
+
+def _throttle() -> None:
+    """Sleep as needed to keep Sheets API calls under 60/min."""
+    global _last_call_ts
+    elapsed = time.time() - _last_call_ts
+    if elapsed < _MIN_CALL_INTERVAL:
+        time.sleep(_MIN_CALL_INTERVAL - elapsed)
+    _last_call_ts = time.time()
+
+
+def _retry_on_rate_limit(func, *args, **kwargs):
+    """Execute a Sheets API call, throttling first and retrying on 429."""
+    for attempt in range(_MAX_RETRIES):
+        _throttle()
+        try:
+            return func(*args, **kwargs)
+        except HttpError as exc:
+            if exc.resp.status == 429 and attempt < _MAX_RETRIES - 1:
+                wait = _RETRY_DELAY * (attempt + 1)
+                logger.warning("Rate limited — retrying in %ds (attempt %d/%d)", wait, attempt + 1, _MAX_RETRIES)
+                time.sleep(wait)
+            else:
+                raise
 
 
 def build_sheets_service(credentials: service_account.Credentials):
@@ -35,10 +66,10 @@ def detect_sheet_names(sheets_service, spreadsheet_id: str) -> List[str]:
         List of sheet/tab names in order.
     """
     try:
-        metadata = (
+        metadata = _retry_on_rate_limit(
             sheets_service.spreadsheets()
             .get(spreadsheetId=spreadsheet_id, fields="sheets.properties.title")
-            .execute()
+            .execute
         )
         names = [s["properties"]["title"] for s in metadata.get("sheets", [])]
         logger.debug("Spreadsheet %s tabs: %s", spreadsheet_id, names)
@@ -77,11 +108,11 @@ def read_sheet_as_dataframe(
     """
     range_notation = f"'{sheet_name}'"
     try:
-        result = (
+        result = _retry_on_rate_limit(
             sheets_service.spreadsheets()
             .values()
             .get(spreadsheetId=spreadsheet_id, range=range_notation)
-            .execute()
+            .execute
         )
     except HttpError as exc:
         if exc.resp.status == 400:
@@ -152,9 +183,26 @@ def read_sheet_as_dataframe(
     df = pd.DataFrame(padded_rows, columns=headers)
     # Drop fully empty rows
     df = df[df.apply(lambda r: any(str(v).strip() for v in r), axis=1)].reset_index(drop=True)
+    # Deduplicate column names (some sheets have repeated headers)
+    seen = {}
+    new_cols = []
+    for col in df.columns:
+        if col in seen:
+            seen[col] += 1
+            new_cols.append(f"{col}_{seen[col]}")
+        else:
+            seen[col] = 0
+            new_cols.append(col)
+    df.columns = new_cols
+
+    # Drop columns that are entirely empty (saves memory on wide sheets)
+    empty_mask = df.fillna("").astype(str).apply(lambda c: c.str.strip().eq("").all())
+    empty_cols = empty_mask[empty_mask].index.tolist()
+    if empty_cols:
+        df = df.drop(columns=empty_cols)
     logger.info(
-        "Read '%s' from %s: %d rows × %d columns",
-        sheet_name, spreadsheet_id, len(df), len(df.columns),
+        "Read '%s' from %s: %d rows × %d columns (dropped %d empty cols)",
+        sheet_name, spreadsheet_id, len(df), len(df.columns), len(empty_cols),
     )
     return df
 
@@ -187,11 +235,11 @@ def find_account_cell(
 
     # Read raw sheet values
     try:
-        resp = (
+        resp = _retry_on_rate_limit(
             sheets_service.spreadsheets()
             .values()
             .get(spreadsheetId=spreadsheet_id, range=f"'{sheet_name}'")
-            .execute()
+            .execute
         )
     except HttpError as exc:
         result["debug"] = f"Failed to read sheet: {exc}"
