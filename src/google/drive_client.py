@@ -21,13 +21,14 @@ def build_drive_service(credentials: service_account.Credentials):
     return build("drive", "v3", credentials=credentials)
 
 
-def list_sheets_in_folder(drive_service, folder_id: str) -> List[dict]:
+def list_sheets_in_folder(drive_service, folder_id: str, recurse: bool = True) -> List[dict]:
     """
-    Lists all Google Sheets files in a Drive folder.
+    Lists all Google Sheets files in a Drive folder, optionally recursing into subfolders.
 
     Args:
         drive_service: Authenticated Drive API service.
         folder_id: Google Drive folder ID (from the folder URL).
+        recurse: If True, also scan subfolders (and their subfolders).
 
     Returns:
         List of dicts with keys: id, name, modifiedTime.
@@ -35,24 +36,37 @@ def list_sheets_in_folder(drive_service, folder_id: str) -> List[dict]:
     Raises:
         HttpError: If the folder is not accessible (wrong ID or no permission).
     """
-    query = (
-        f"'{folder_id}' in parents "
-        "and mimeType='application/vnd.google-apps.spreadsheet' "
-        "and trashed=false"
-    )
     try:
+        # Get spreadsheets in this folder
+        sheets_query = (
+            f"'{folder_id}' in parents "
+            "and mimeType='application/vnd.google-apps.spreadsheet' "
+            "and trashed=false"
+        )
         response = (
             drive_service.files()
-            .list(
-                q=query,
-                fields="files(id, name, modifiedTime)",
-                orderBy="name",
-                pageSize=100,
-            )
+            .list(q=sheets_query, fields="files(id, name, modifiedTime)", orderBy="name", pageSize=100)
             .execute()
         )
-        files = response.get("files", [])
-        logger.info("Found %d spreadsheet(s) in folder %s", len(files), folder_id)
+        files = list(response.get("files", []))
+
+        if recurse:
+            # Find subfolders and recurse
+            folder_query = (
+                f"'{folder_id}' in parents "
+                "and mimeType='application/vnd.google-apps.folder' "
+                "and trashed=false"
+            )
+            folder_resp = (
+                drive_service.files()
+                .list(q=folder_query, fields="files(id, name)", pageSize=100)
+                .execute()
+            )
+            for subfolder in folder_resp.get("files", []):
+                sub_files = list_sheets_in_folder(drive_service, subfolder["id"], recurse=True)
+                files.extend(sub_files)
+
+        logger.info("Found %d spreadsheet(s) in folder %s (recurse=%s)", len(files), folder_id, recurse)
         return files
     except HttpError as exc:
         raise HttpError(
@@ -68,23 +82,66 @@ def discover_regional_files(
     pattern_map: Dict[str, str],
 ) -> Dict[str, str]:
     """
-    Discovers regional spreadsheet IDs by matching filenames against patterns.
+    Discovers regional spreadsheet IDs from a Drive folder.
 
-    If pattern_map is empty OR no patterns match any file, falls back to
-    auto-discovery: every spreadsheet in the folder becomes its own region,
-    keyed by filename.
+    Supports two folder structures:
+    1. **Subfolder-based** (preferred): Each subfolder is a region, and every
+       spreadsheet inside it (recursively) is mapped as "Region/AE Name".
+    2. **Flat**: All spreadsheets in one folder, matched by filename patterns.
+
+    If the root folder contains subfolders, subfolder-based discovery is used
+    and pattern_map is ignored. Otherwise, falls back to pattern matching or
+    auto-discovery.
 
     Args:
         drive_service: Authenticated Drive API service.
         folder_id: Google Drive folder ID.
-        pattern_map: Dict mapping region name to fnmatch pattern.
-                     Example: {"APAC": "*APAC*", "EMEA": "*EMEA*"}
-                     Pass an empty dict to auto-discover all files.
+        pattern_map: Dict mapping region name to fnmatch pattern (flat mode).
 
     Returns:
-        Dict mapping region name to spreadsheet ID.
+        Dict mapping region/AE label to spreadsheet ID.
     """
-    files = list_sheets_in_folder(drive_service, folder_id)
+    try:
+        # Check for subfolders first
+        folder_query = (
+            f"'{folder_id}' in parents "
+            "and mimeType='application/vnd.google-apps.folder' "
+            "and trashed=false"
+        )
+        folder_resp = (
+            drive_service.files()
+            .list(q=folder_query, fields="files(id, name)", orderBy="name", pageSize=100)
+            .execute()
+        )
+        subfolders = folder_resp.get("files", [])
+    except HttpError as exc:
+        raise HttpError(resp=exc.resp, content=exc.content, uri=f"folder listing {folder_id}") from exc
+
+    result: Dict[str, str] = {}
+
+    # ── Subfolder-based discovery ──
+    if subfolders:
+        for subfolder in subfolders:
+            region_name = subfolder["name"]
+            sheets = list_sheets_in_folder(drive_service, subfolder["id"], recurse=True)
+            for sheet in sheets:
+                label = f"{region_name}/{_filename_to_region(sheet['name'])}"
+                result[label] = sheet["id"]
+                logger.info("Region '%s' → '%s' (id: %s)", label, sheet["name"], sheet["id"])
+
+        # Also pick up any spreadsheets directly in the root folder
+        root_sheets = list_sheets_in_folder(drive_service, folder_id, recurse=False)
+        for sheet in root_sheets:
+            label = _filename_to_region(sheet["name"])
+            result[label] = sheet["id"]
+            logger.info("Root sheet '%s' → '%s' (id: %s)", label, sheet["name"], sheet["id"])
+
+        if result:
+            logger.info("Discovered %d spreadsheet(s) across %d region subfolder(s)", len(result), len(subfolders))
+            return result
+
+    # ── Flat folder: pattern matching or auto-discovery ──
+    files = list_sheets_in_folder(drive_service, folder_id, recurse=False)
 
     if not files:
         raise ValueError(
@@ -92,31 +149,20 @@ def discover_regional_files(
             "Check that the service account has Viewer access to the folder."
         )
 
-    # Pattern-based matching
-    result: Dict[str, str] = {}
     if pattern_map:
         for region, pattern in pattern_map.items():
             matches = [f for f in files if fnmatch.fnmatch(f["name"], pattern)]
             if not matches:
-                logger.warning(
-                    "No file found for region '%s' with pattern '%s' in folder %s",
-                    region, pattern, folder_id,
-                )
+                logger.warning("No file for region '%s' pattern '%s'", region, pattern)
                 continue
             if len(matches) > 1:
-                logger.warning(
-                    "Multiple files match region '%s' pattern '%s': %s — using first.",
-                    region, pattern, [m["name"] for m in matches],
-                )
+                logger.warning("Multiple matches for '%s': %s — using first.", region, [m["name"] for m in matches])
             chosen = matches[0]
             result[region] = chosen["id"]
             logger.info("Region '%s' → '%s' (id: %s)", region, chosen["name"], chosen["id"])
 
-    # Fallback: auto-discover all files as regions (filename = region key)
     if not result:
-        logger.warning(
-            "No pattern matches found — auto-discovering all %d file(s) as regions.", len(files)
-        )
+        logger.warning("Auto-discovering all %d file(s) as regions.", len(files))
         for f in files:
             region_key = _filename_to_region(f["name"])
             result[region_key] = f["id"]
@@ -144,7 +190,9 @@ def _filename_to_region(filename: str) -> str:
         if idx > 0:
             name = name[:idx]
             break
-    return name.strip() or filename
+    # Clean trailing separators
+    name = name.strip().rstrip("-").strip()
+    return name or filename
 
 
 def get_file_metadata(drive_service, file_id: str) -> dict:
